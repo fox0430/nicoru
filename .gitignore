@@ -1,0 +1,7 @@
+nicoru
+src/nicoru
+!tests/*.*
+
+.history
+src/.history
+src/pkgs/.history

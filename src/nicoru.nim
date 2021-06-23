@@ -1,4 +1,4 @@
-import parseopt, strformat, os, strutils
+import parseopt, strformat, os, strutils, pegs
 import pkgs/[image, container, settings, cgroups, help]
 
 type CmdOption = object
@@ -31,8 +31,23 @@ proc containsKey(cmdOptions: seq[CmdOption], key: string): bool =
     if option.key == key:
       return true
 
+proc staticReadVersionFromNimble: string {.compileTime.} =
+  let peg = """@ "version" \s* "=" \s* \" {[0-9.]+} \" @ $""".peg
+  var captures: seq[string] = @[""]
+  let
+    nimblePath = currentSourcePath.parentDir() / "../nicoru.nimble"
+    nimbleSpec = staticRead(nimblePath)
+
+  assert nimbleSpec.match(peg, captures)
+  assert captures.len == 1
+  return captures[0]
+
+proc generateVersionInfoMessage(): string =
+  const versionInfo = "nicoru v" & staticReadVersionFromNimble()
+  result = versionInfo
+
 proc writeVersion() =
-  echo "v0.1.0"
+  echo generateVersionInfoMessage()
   quit()
 
 proc writeCmdLineError(key: string) =
@@ -248,6 +263,8 @@ proc checkShortOptions(shortOptions: seq[CmdOption]) =
   else:
     if shortOptions[0].key == "h":
       writeTopHelp()
+    elif shortOptions[0].key == "v":
+      writeVersion()
     else:
       writeCmdLineError($shortOptions)
 

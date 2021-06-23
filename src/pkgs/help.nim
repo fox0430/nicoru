@@ -1,6 +1,6 @@
 const topHelpMessage = """
 
-Usage:  dress [OPTIONS] COMMAND
+Usage:  nicoru [OPTIONS] COMMAND
 
 Options:
   -v    Print version
