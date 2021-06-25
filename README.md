@@ -8,9 +8,21 @@ NOTE: Work in progress.
 
 - Create/Run a container
 
+- Daemon-less
+
 - Docker image support
 
-- Management of images
+- Management of container/image
+
+## Installation
+
+nicoru can run on only GNU/Linux
+
+- Nim v1.4.8 or higher
+
+```
+nimble install nicoru
+```
 
 ## License
 
