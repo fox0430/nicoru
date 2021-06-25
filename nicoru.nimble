@@ -2,7 +2,7 @@
 
 version       = "0.1.0"
 author        = "fox0430"
-description   = "A new awesome nimble package"
+description   = "A container runtime written in Nim"
 license       = "MIT"
 srcDir        = "src"
 bin           = @["nicoru"]
