@@ -21,37 +21,37 @@ Commands:
 
 const createHelpMessage = """
 
-Usage:  dress create IMAGE
+Usage:  nicoru create IMAGE
 """
 
 const imageHelpMessage = """
 
-Usage:  dress images
+Usage:  nicoru images
 """
 
 const psHelpMessage = """
 
-Usage:  dress ps
+Usage:  nicoru ps
 """
 
 const pullHelpMessage = """
 
-Usage:  dress pull IMAGE
+Usage:  nicoru pull IMAGE
 """
 
 const rmHelpMessage = """
 
-Usage:  dress rm IMAGE
+Usage:  nicoru rm IMAGE
 """
 
 const rmiHelpMessage = """
 
-Usage:  dress rmi IMAGE
+Usage:  nicoru rmi IMAGE
 """
 
 const runHelpMessage = """
 
-Usage:  dress run [OPTIONS] IMAGE [COMMAND] [ARG...]
+Usage:  nicoru run [OPTIONS] IMAGE [COMMAND] [ARG...]
 
 Options:
   -b                    Run a container in background
@@ -63,17 +63,17 @@ Options:
 
 const startHelpMessage = """
 
-Usage:  dress start IMAGE
+Usage:  nicoru start IMAGE
 """
 
 const logHelpMessage = """
 
-Usage:  dress log CONTAINER
+Usage:  nicoru log CONTAINER
 """
 
 const stopHelpMessage = """
 
-Usage:  dress stop [OPTIONS] CONTAINER
+Usage:  nicoru stop [OPTIONS] CONTAINER
 
 Options:
   -f    Force stop a container

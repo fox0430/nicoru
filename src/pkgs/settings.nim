@@ -6,4 +6,4 @@ type RuntimeSettings* = object
   background*: bool
 
 proc initRuntimeSetting*(): RuntimeSettings =
-  result.baseDir = getHomeDir() / ".local/share/dress"
+  result.baseDir = getHomeDir() / ".local/share/nicoru"
