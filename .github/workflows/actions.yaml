@@ -12,6 +12,7 @@ on:
     paths-ignore:
       - 'LICENSE'
       - '*.md'
+      - 'documents/**'
 
 jobs:
   skip:
