@@ -245,7 +245,7 @@ proc checkArgments(runtimeSettings: var RuntimeSettings,
       if isHelp(args, shortOptions): writeStartHelp()
       elif args.len == 2: cmdStart(runtimeSettings, args[1])
     of "log":
-      if isHelp(args, shortOptions): writeStartHelp()
+      if isHelp(args, shortOptions): writeLogHelp()
       elif args.len == 2: cmdLog(runtimeSettings, args[1])
     of "stop":
       if isHelp(args, shortOptions): writeStopHelp()
