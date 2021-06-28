@@ -196,6 +196,10 @@ proc isHelp(args: seq[string],
 
   args.len == 1 and shortOptions.len == 1 and shortOptions[0].key == "h"
 
+# leastArg is the number of args for option
+proc writeNotEnoughArgError(option: string, leastArg: int) {.inline.} =
+  echo fmt "nicoru {option}: requires at least {leastArg} argument."
+
 proc checkArgments*(runtimeSettings: var RuntimeSettings,
                     cmdParseInfo: CmdParseInfo) =
 
@@ -209,51 +213,98 @@ proc checkArgments*(runtimeSettings: var RuntimeSettings,
 
   case args[0]:
     of "pull":
-      if isHelp(args, shortOptions): writePullHelpMessage()
-      elif args.len == 2: cmdPull(runtimeSettings, args[1])
-      elif args.len == 3: cmdPull(runtimeSettings, args[1], args[2])
-      else: writeCmdLineError($args)
+      if args.len == 1:
+        writeNotEnoughArgError("pull", 1)
+      elif isHelp(args, shortOptions):
+        writePullHelpMessage()
+      elif args.len == 2:
+        cmdPull(runtimeSettings, args[1])
+      elif args.len == 3:
+        cmdPull(runtimeSettings, args[1], args[2])
+      else:
+        writeCmdLineError($args)
     of "images":
-      if isHelp(args, shortOptions): writeImageHelpMessage()
-      elif args.len == 1: cmdImages(runtimeSettings)
-      else: writeCmdLineError($args)
+      if isHelp(args, shortOptions):
+        writeImageHelpMessage()
+      elif args.len == 1:
+        cmdImages(runtimeSettings)
+      else:
+        writeCmdLineError($args)
     of "create":
-      if isHelp(args, shortOptions): writeCreateHelpMessage()
+      if args.len == 1:
+        writeNotEnoughArgError("create", 1)
+      elif isHelp(args, shortOptions):
+        writeCreateHelpMessage()
       else:
         let cgroupSettings = initCgroupsSettings(longOptions)
-        if args.len == 2: cmdCreate(runtimeSettings, cgroupSettings, args[1])
-        elif args.len == 3: cmdCreate(runtimeSettings, cgroupSettings, args[1], args[2])
-        else: writeCmdLineError($args)
+        if args.len == 2:
+          cmdCreate(runtimeSettings, cgroupSettings, args[1])
+        elif args.len == 3:
+          cmdCreate(runtimeSettings, cgroupSettings, args[1], args[2])
+        else:
+          writeCmdLineError($args)
     of "run":
-      if isHelp(args, shortOptions): writeRunHelp()
+      if args.len == 1:
+        writeNotEnoughArgError("run", 1)
+      elif isHelp(args, shortOptions):
+        writeRunHelp()
       else:
         let cgroupSettings = initCgroupsSettings(longOptions)
         if shortOptions.containsKey("b"):
           runtimeSettings.background = true
-        if args.len == 2: cmdRun(runtimeSettings, cgroupSettings, args[1])
-        else: cmdRun(runtimeSettings, cgroupSettings, args[1], args[2 .. ^1])
+        if args.len == 2:
+          cmdRun(runtimeSettings, cgroupSettings, args[1])
+        else:
+          cmdRun(runtimeSettings, cgroupSettings, args[1], args[2 .. ^1])
     of "ps":
       if isHelp(args, shortOptions): writePsHelpMessage()
       elif args.len == 1: cmdPs(runtimeSettings)
     of "rm":
-      if isHelp(args, shortOptions): writeRmHelpMessage()
-      elif args.len == 2: cmdRm(runtimeSettings, args[1])
+      if args.len == 1:
+        writeNotEnoughArgError("rm", 1)
+      elif isHelp(args, shortOptions):
+        writeRmHelpMessage()
+      elif args.len == 2:
+        cmdRm(runtimeSettings, args[1])
+      else:
+        writeCmdLineError($args)
     of "rmi":
-      if isHelp(args, shortOptions): writeRmiHelpMessage()
-      elif args.len == 2: cmdRmi(runtimeSettings, args[1])
+      if args.len == 1:
+        writeNotEnoughArgError("rmi", 1)
+      elif isHelp(args, shortOptions):
+        writeRmiHelpMessage()
+      elif args.len == 2:
+        cmdRmi(runtimeSettings, args[1])
+      else:
+        writeCmdLineError($args)
     of "start":
-      if isHelp(args, shortOptions): writeStartHelp()
-      elif args.len == 2: cmdStart(runtimeSettings, args[1])
+      if args.len == 1:
+        writeNotEnoughArgError("start", 1)
+      elif isHelp(args, shortOptions):
+        writeStartHelp()
+      elif args.len == 2:
+        cmdStart(runtimeSettings, args[1])
+      else:
+        writeCmdLineError($args)
     of "log":
-      if isHelp(args, shortOptions): writeStartHelp()
-      elif args.len == 2: cmdLog(runtimeSettings, args[1])
+      if args.len == 1:
+        writeNotEnoughArgError("log", 1)
+      elif isHelp(args, shortOptions):
+        writeStartHelp()
+      elif args.len == 2:
+        cmdLog(runtimeSettings, args[1])
+      else:
+        writeCmdLineError($args)
     of "stop":
-      if isHelp(args, shortOptions): writeStopHelp()
+      if args.len == 1:
+        writeNotEnoughArgError("stop", 1)
+      if isHelp(args, shortOptions):
+        writeStopHelp()
       elif args.len == 2:
         let force = if shortOptions.containsKey("f"): true else: false
         cmdStop(runtimeSettings, args[1], force)
-
-      else: writeCmdLineError($args)
+      else:
+        writeCmdLineError($args)
     else:
       writeCmdLineError($args)
 
