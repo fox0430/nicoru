@@ -258,8 +258,8 @@ proc createContainer*(repo, tag, baseDir, containersDir: string,
   createDir(containersDir)
 
   let
-    imagesDir = baseDir / "imagesDir"
-    dbPath = baseDir / "images" / "repositorys.json"
+    imagesDir = settings.imagesPath()
+    dbPath = settings.databasePath()
     imageId = getImageIdFromLocal(repo, tag, dbPath, debug)
 
   let cDir = containersDir / containerId
@@ -314,7 +314,7 @@ proc execContainer*(settings: RuntimeSettings,
   let
     repo = config.repo
     tag = config.tag
-    dbPath = settings.baseDir / "images" / "repositorys.json"
+    dbPath = settings.imagesPath()
     imageId = config.imageId
 
   # TODO: Fix name
