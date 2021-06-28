@@ -138,11 +138,10 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeCreateHelpMessage()
   elif args.len == 1:
     writeNotEnoughArgError("create", 1)
-  elif args.len == 2 or args.len == 3:
-    # TODO: Delete
-    const command = @["/bin/sh"]
-
+  elif args.len > 1:
     let
+      command = if args.len > 1: args[2 .. ^1] else: @[""]
+
       cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
       imagesDir = runtimeSettings.baseDir / "images"
       containerDir = runtimeSettings.baseDir / "containers"
