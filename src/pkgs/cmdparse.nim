@@ -109,13 +109,12 @@ proc parseImageAndTag(str: string): (string, string) =
   return (image, tag)
 
 proc cmdPull(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
-
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("pull", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writePullHelpMessage()
+  elif args.len == 1:
+    writeNotEnoughArgError("pull", 1)
   elif args.len == 2:
     let imageAndTag = parseImageAndTag(args[1])
     pullImage(runtimeSettings, imageAndTag[0], imageAndTag[1])
@@ -123,7 +122,6 @@ proc cmdPull(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeCmdLineError($args)
 
 proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
-
   let args = cmdParseInfo.argments
 
   if isHelp(args, cmdParseInfo.shortOptions):
@@ -134,13 +132,12 @@ proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeCmdLineError($args)
 
 proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
-
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("create", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeCreateHelpMessage()
+  elif args.len == 1:
+    writeNotEnoughArgError("create", 1)
   elif args.len == 2 or args.len == 3:
     # TODO: Delete
     const command = @["/bin/sh"]
@@ -164,15 +161,12 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeCmdLineError($args)
 
 proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
-
   let args = cmdParseInfo.argments
 
-  echo args.len
-
-  if args.len == 0:
-    writeNotEnoughArgError("run", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeRunHelp()
+  elif args.len == 1:
+    writeNotEnoughArgError("run", 1)
   else:
     let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
     if cmdParseInfo.shortOptions.containsKey("b"):
@@ -202,7 +196,6 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
         command)
 
 proc cmdPs(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
-
   let args = cmdParseInfo.argments
 
   if isHelp(args, cmdParseInfo.shortOptions):
@@ -216,10 +209,10 @@ proc cmdPs(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("rm", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeRmHelpMessage()
+  elif args.len == 1:
+    writeNotEnoughArgError("rm", 1)
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
@@ -231,10 +224,10 @@ proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("rmi", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeRmiHelpMessage()
+  elif args.len == 1:
+    writeNotEnoughArgError("rmi", 1)
   elif args.len == 2:
     let
       imagesDir = runtimeSettings.baseDir / "images"
@@ -247,10 +240,10 @@ proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 proc cmdStart(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("start", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeStartHelp()
+  elif args.len == 1:
+    writeNotEnoughArgError("start", 1)
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
@@ -262,10 +255,10 @@ proc cmdStart(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 proc cmdLog(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
-  if args.len == 1:
-    writeNotEnoughArgError("log", 1)
-  elif isHelp(args, cmdParseInfo.shortOptions):
+  if isHelp(args, cmdParseInfo.shortOptions):
     writeStartHelp()
+  elif args.len == 1:
+    writeNotEnoughArgError("log", 1)
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
@@ -279,10 +272,10 @@ proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     args = cmdParseInfo.argments
     shortOptions = cmdParseInfo.shortOptions
 
-  if args.len == 1:
-    writeNotEnoughArgError("stop", 1)
   if isHelp(args, shortOptions):
     writeStopHelp()
+  elif args.len == 1:
+    writeNotEnoughArgError("stop", 1)
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
