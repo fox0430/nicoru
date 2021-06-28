@@ -457,7 +457,7 @@ proc runContainer*(settings: RuntimeSettings,
     execContainer(settings, config, containersDir)
   else:
     # TODO: Add Root-less mode
-    discard
+    echo "Error: You need to be root to run nicoru."
 
 proc getCurrentstate(stateJson: JsonNode): State {.inline.} =
   for key, item in stateJson:
@@ -518,7 +518,7 @@ proc startContainer*(settings: RuntimeSettings,
     execContainer(settings, config, containersDir)
   else:
     # TODO: Add Rootless mode
-    discard
+    echo "Error: You need to be root to run nicoru."
 
 proc writeContainerLog*(containersDir, containerId: string) =
   if isExistContainer(containersDir, containerId):
