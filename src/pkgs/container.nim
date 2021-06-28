@@ -262,9 +262,9 @@ proc createContainer*(repo, tag, baseDir, containersDir: string,
     dbPath = baseDir / "images" / "repositorys.json"
     imageId = getImageIdFromLocal(repo, tag, dbPath, debug)
 
-  # TODO: Fix name
-  let containerDir = containersDir / containerId
-  if not dirExists(containerDir): createDir(containerDir)
+  let cDir = containersDir / containerId
+  if not dirExists(cDir):
+    createDir(cDir)
 
   result = initContainerConfig(baseDir,
                                imageId,
@@ -273,10 +273,13 @@ proc createContainer*(repo, tag, baseDir, containersDir: string,
                                tag,
                                cgroups)
 
-  let hostnamePath = containerDir / "hostname"
+  if command.len > 0 and command[0].len > 0:
+    result.cmd = command
+
+  let hostnamePath = cDir / "hostname"
   putHostnameFile(containerId, hostnamePath)
 
-  setCurrentDir(containerDir)
+  setCurrentDir(cDir)
 
   if fileExists(baseDir / "images/sha256" / imageId[7 .. ^1]):
     let
