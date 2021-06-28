@@ -2,7 +2,7 @@ import os, strformat, httpclient, json, asyncdispatch, strutils, osproc
 import settings
 
 type ImageInfo = object
-  repository: string
+  repo: string
   tag: string
 
 type ImageConfig* = object
@@ -336,7 +336,7 @@ proc getRepoAndTagByimageId(settings: RuntimeSettings, imageId: string): ImageIn
       if id == imageId:
         let strSplit = repoAndTag.split(":")
         if strSplit.len == 2:
-          return ImageInfo(repository: strSplit[0], tag: strSplit[1])
+          return ImageInfo(repo: strSplit[0], tag: strSplit[1])
 
 proc removeImage*(settings: RuntimeSettings, layerDir, item: string) =
   let
@@ -375,10 +375,10 @@ proc removeImage*(settings: RuntimeSettings, layerDir, item: string) =
   # Update DB
   let info = settings.getRepoAndTagByimageId(imageId)
   var newJson = dbJson
-  if newJson["Repository"][info.repository].len == 1:
-    newJson["Repository"].delete(info.repository)
+  if newJson["Repository"][info.repo].len == 1:
+    newJson["Repository"].delete(info.repo)
   else:
-    newJson["Repository"][info.repository].delete(fmt "{repo}:{tag}")
+    newJson["Repository"][info.repo].delete(fmt "{info.repo}:{info.tag}")
 
   try:
     writeFile(dbPath, $newJson)
