@@ -85,120 +85,215 @@ proc parseCommandLineOption*(): CmdParseInfo =
       of cmdEnd:
         assert(false)
 
-proc cmdPull(runtimeSettings: RuntimeSettings, repo, tag: string) {.inline.} =
-  pullImage(runtimeSettings, repo, tag)
-
-proc cmdPull(runtimeSettings: RuntimeSettings, repo: string) {.inline.} =
-  const tag = "latest"
-  pullImage(runtimeSettings, repo, tag)
-
-proc cmdImages(runtimeSettings: RuntimeSettings) {.inline.} =
-  writeImageList(runtimeSettings.baseDir)
-
-proc cmdCreate(runtimeSettings: RuntimeSettings,
-               cgroupSettings: CgroupsSettgings,
-               repo, tag: string,
-               command: seq[string]) {.inline.} =
-
-  let imagesDir = runtimeSettings.baseDir / "images"
-
-  let containerDir = runtimeSettings.baseDir / "containers"
-
-  if not checkImageInLocal(repo, tag, imagesDir, runtimeSettings.debug):
-    pullImage(runtimeSettings, repo, tag)
-
-  let containerId = createContainer(repo, tag, runtimeSettings.baseDir, containerDir,
-                                    cgroupSettings,
-                                    runtimeSettings.debug,
-                                    command)
-  echo fmt"{containerId} created"
-
-proc cmdCreate(runtimeSettings: RuntimeSettings,
-               cgroupSettings: CgroupsSettgings,
-               repo, tag: string) {.inline.} =
-  # TODO: Fix
-  const command = @["/bin/sh"]
-
-  cmdCreate(runtimeSettings, cgroupSettings, repo, tag, command)
-
-proc cmdCreate(runtimeSettings: RuntimeSettings,
-               cgroupSettings: CgroupsSettgings,
-               repo: string) {.inline.} =
-  const
-    # TODO: Fix
-    command = @["/bin/sh"]
-    # TODO: Fix
-    tag = "latest"
-
-  cmdCreate(runtimeSettings, cgroupSettings, repo, tag, command)
-
-proc cmdRun(runtimeSettings: RuntimeSettings,
-            cgroupSettings: CgroupsSettgings,
-            repo: string,
-            command: seq[string]) {.inline.} =
-
-  let
-    imagesDir = runtimeSettings.baseDir / "images"
-    containersDir = runtimeSettings.baseDir / "containers"
-
-    repoSplit = repo.split(":")
-    repo = repoSplit[0]
-    tag = if repoSplit.len > 1: repoSplit[1] else: "latest"
-
-  if not checkImageInLocal(repo, tag, imagesDir, runtimeSettings.debug):
-    pullImage(runtimeSettings, repo, tag)
-
-  runContainer(runtimeSettings, cgroupSettings, repo, tag, containersDir, command)
-
-proc cmdRun(runtimeSettings: RuntimeSettings,
-            cgroupSettings: CgroupsSettgings,
-            repo: string) {.inline.} =
-
-  # TODO: Fix
-  const command = @["/bin/sh"]
-
-  cmdRun(runtimeSettings, cgroupSettings, repo, command)
-
-proc cmdPs(runtimeSettings: RuntimeSettings) {.inline.} =
-  let
-    containersDir = runtimeSettings.baseDir / "containers"
-  writeAllContainerState(containersDir)
-
-proc cmdRm(runtimeSettings: RuntimeSettings, containerId: string) {.inline.} =
-  let containersDir = runtimeSettings.baseDir / "containers"
-  removeContainer(containersDir, containerId)
-
-proc cmdRmi(runtimeSettings: RuntimeSettings, item: string) {.inline.} =
-  let
-    imagesDir = runtimeSettings.baseDir / "images"
-    layerDir = runtimeSettings.baseDir / "layer"
-  removeImage(imagesDir, layerDir, item)
-
-proc cmdStart(runtimeSettings: RuntimeSettings, containerId: string) {.inline.} =
-  let containersDir = runtimeSettings.baseDir / "containers"
-  startContainer(runtimeSettings, containersDir, containerId)
-
-proc cmdLog(runtimeSettings: RuntimeSettings, containerId: string) {.inline.} =
-  let containersDir = runtimeSettings.baseDir / "containers"
-  writeContainerLog(containersDir, containerId)
-
-proc cmdStop(runtimeSettings: RuntimeSettings,
-             containerId: string, force: bool) {.inline.} =
-
-  let containersDir = runtimeSettings.baseDir / "containers"
-  if force:
-    forceStopContainer(containersDir, containerId)
-  else:
-    stopContainer(containersDir, containerId)
-
-proc isHelp(args: seq[string],
-            shortOptions: seq[CmdOption]): bool {.inline.} =
+proc isHelp(args: seq[string], shortOptions: seq[CmdOption]): bool {.inline.} =
 
   args.len == 1 and shortOptions.len == 1 and shortOptions[0].key == "h"
 
 # leastArg is the number of args for option
 proc writeNotEnoughArgError(option: string, leastArg: int) {.inline.} =
   echo fmt "nicoru {option}: requires at least {leastArg} argument."
+
+proc parseImageAndTag(str: string): (string, string) =
+  var
+    image = ""
+    tag = ""
+
+  if str.contains(":"):
+    let splited = str.split(":")
+    image = splited[0]
+    tag = splited[1]
+  else:
+    image = str
+    tag = "latest"
+
+  return (image, tag)
+
+proc cmdPull(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("pull", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writePullHelpMessage()
+  elif args.len == 2:
+    let imageAndTag = parseImageAndTag(args[1])
+    pullImage(runtimeSettings, imageAndTag[0], imageAndTag[1])
+  else:
+    writeCmdLineError($args)
+
+proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+
+  let args = cmdParseInfo.argments
+
+  if isHelp(args, cmdParseInfo.shortOptions):
+    writeImageHelpMessage()
+  elif args.len == 1:
+    writeImageList(runtimeSettings.baseDir)
+  else:
+    writeCmdLineError($args)
+
+proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("create", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeCreateHelpMessage()
+  elif args.len == 2 or args.len == 3:
+    # TODO: Delete
+    const command = @["/bin/sh"]
+
+    let
+      cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
+      imagesDir = runtimeSettings.baseDir / "images"
+      containerDir = runtimeSettings.baseDir / "containers"
+
+      imageAndTag = parseImageAndTag(args[1])
+
+      containerId = createContainer(
+        imageAndTag[0],
+        imageAndTag[1],
+        runtimeSettings.baseDir,
+        containerDir,
+        cgroupSettings,
+        runtimeSettings.debug,
+        command)
+  else:
+    writeCmdLineError($args)
+
+proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+
+  let args = cmdParseInfo.argments
+
+  echo args.len
+
+  if args.len == 0:
+    writeNotEnoughArgError("run", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeRunHelp()
+  else:
+    let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
+    if cmdParseInfo.shortOptions.containsKey("b"):
+      runtimeSettings.background = true
+    if args.len > 1:
+      let
+        imagesDir = runtimeSettings.baseDir / "images"
+        containersDir = runtimeSettings.baseDir / "containers"
+
+        imageAndTag = parseImageAndTag(args[1])
+
+        image = imageAndTag[0]
+        tag = imageAndTag[1]
+
+      if not checkImageInLocal(image, tag, imagesDir, runtimeSettings.debug):
+        pullImage(runtimeSettings, image, tag)
+
+      # TODO: Fix
+      let command = if args.len > 1: args[2 .. ^1] else: @["/bin/sh"]
+
+      runContainer(
+        runtimeSettings,
+        cgroupSettings,
+        image,
+        tag,
+        containersDir,
+        command)
+
+proc cmdPs(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+
+  let args = cmdParseInfo.argments
+
+  if isHelp(args, cmdParseInfo.shortOptions):
+    writePsHelpMessage()
+  elif args.len == 1:
+    let containersDir = runtimeSettings.baseDir / "containers"
+    writeAllContainerState(containersDir)
+  else:
+    writeCmdLineError($args)
+
+proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("rm", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeRmHelpMessage()
+  elif args.len == 2:
+    let
+      containersDir = runtimeSettings.baseDir / "containers"
+      containerId = args[1]
+    removeContainer(containersDir, containerId)
+  else:
+    writeCmdLineError($args)
+
+proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("rmi", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeRmiHelpMessage()
+  elif args.len == 2:
+    let
+      imagesDir = runtimeSettings.baseDir / "images"
+      layerDir = runtimeSettings.baseDir / "layer"
+      image = args[1]
+    removeImage(imagesDir, layerDir, image)
+  else:
+    writeCmdLineError($args)
+
+proc cmdStart(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("start", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeStartHelp()
+  elif args.len == 2:
+    let
+      containersDir = runtimeSettings.baseDir / "containers"
+      containerId = args[1]
+    startContainer(runtimeSettings, containersDir, containerId)
+  else:
+    writeCmdLineError($args)
+
+proc cmdLog(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+  let args = cmdParseInfo.argments
+
+  if args.len == 1:
+    writeNotEnoughArgError("log", 1)
+  elif isHelp(args, cmdParseInfo.shortOptions):
+    writeStartHelp()
+  elif args.len == 2:
+    let
+      containersDir = runtimeSettings.baseDir / "containers"
+      containerId = args[1]
+    writeContainerLog(containersDir, containerId)
+  else:
+    writeCmdLineError($args)
+
+proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+  let
+    args = cmdParseInfo.argments
+    shortOptions = cmdParseInfo.shortOptions
+
+  if args.len == 1:
+    writeNotEnoughArgError("stop", 1)
+  if isHelp(args, shortOptions):
+    writeStopHelp()
+  elif args.len == 2:
+    let
+      containersDir = runtimeSettings.baseDir / "containers"
+      containerId = args[1]
+      isForce = if shortOptions.containsKey("f"): true else: false
+    if isForce:
+      forceStopContainer(containersDir, containerId)
+    else:
+      stopContainer(containersDir, containerId)
+  else:
+    writeCmdLineError($args)
 
 proc checkArgments*(runtimeSettings: var RuntimeSettings,
                     cmdParseInfo: CmdParseInfo) =
@@ -213,98 +308,25 @@ proc checkArgments*(runtimeSettings: var RuntimeSettings,
 
   case args[0]:
     of "pull":
-      if args.len == 1:
-        writeNotEnoughArgError("pull", 1)
-      elif isHelp(args, shortOptions):
-        writePullHelpMessage()
-      elif args.len == 2:
-        cmdPull(runtimeSettings, args[1])
-      elif args.len == 3:
-        cmdPull(runtimeSettings, args[1], args[2])
-      else:
-        writeCmdLineError($args)
+      cmdPull(runtimeSettings, cmdParseInfo)
     of "images":
-      if isHelp(args, shortOptions):
-        writeImageHelpMessage()
-      elif args.len == 1:
-        cmdImages(runtimeSettings)
-      else:
-        writeCmdLineError($args)
+      cmdImages(runtimeSettings, cmdParseInfo)
     of "create":
-      if args.len == 1:
-        writeNotEnoughArgError("create", 1)
-      elif isHelp(args, shortOptions):
-        writeCreateHelpMessage()
-      else:
-        let cgroupSettings = initCgroupsSettings(longOptions)
-        if args.len == 2:
-          cmdCreate(runtimeSettings, cgroupSettings, args[1])
-        elif args.len == 3:
-          cmdCreate(runtimeSettings, cgroupSettings, args[1], args[2])
-        else:
-          writeCmdLineError($args)
+      cmdCreate(runtimeSettings, cmdParseInfo)
     of "run":
-      if args.len == 1:
-        writeNotEnoughArgError("run", 1)
-      elif isHelp(args, shortOptions):
-        writeRunHelp()
-      else:
-        let cgroupSettings = initCgroupsSettings(longOptions)
-        if shortOptions.containsKey("b"):
-          runtimeSettings.background = true
-        if args.len == 2:
-          cmdRun(runtimeSettings, cgroupSettings, args[1])
-        else:
-          cmdRun(runtimeSettings, cgroupSettings, args[1], args[2 .. ^1])
+      cmdRun(runtimeSettings, cmdParseInfo)
     of "ps":
-      if isHelp(args, shortOptions): writePsHelpMessage()
-      elif args.len == 1: cmdPs(runtimeSettings)
+      cmdPs(runtimeSettings, cmdParseInfo)
     of "rm":
-      if args.len == 1:
-        writeNotEnoughArgError("rm", 1)
-      elif isHelp(args, shortOptions):
-        writeRmHelpMessage()
-      elif args.len == 2:
-        cmdRm(runtimeSettings, args[1])
-      else:
-        writeCmdLineError($args)
+      cmdRm(runtimeSettings, cmdParseInfo)
     of "rmi":
-      if args.len == 1:
-        writeNotEnoughArgError("rmi", 1)
-      elif isHelp(args, shortOptions):
-        writeRmiHelpMessage()
-      elif args.len == 2:
-        cmdRmi(runtimeSettings, args[1])
-      else:
-        writeCmdLineError($args)
+      cmdRmi(runtimeSettings, cmdParseInfo)
     of "start":
-      if args.len == 1:
-        writeNotEnoughArgError("start", 1)
-      elif isHelp(args, shortOptions):
-        writeStartHelp()
-      elif args.len == 2:
-        cmdStart(runtimeSettings, args[1])
-      else:
-        writeCmdLineError($args)
+      cmdStart(runtimeSettings, cmdParseInfo)
     of "log":
-      if args.len == 1:
-        writeNotEnoughArgError("log", 1)
-      elif isHelp(args, shortOptions):
-        writeStartHelp()
-      elif args.len == 2:
-        cmdLog(runtimeSettings, args[1])
-      else:
-        writeCmdLineError($args)
+      cmdLog(runtimeSettings, cmdParseInfo)
     of "stop":
-      if args.len == 1:
-        writeNotEnoughArgError("stop", 1)
-      if isHelp(args, shortOptions):
-        writeStopHelp()
-      elif args.len == 2:
-        let force = if shortOptions.containsKey("f"): true else: false
-        cmdStop(runtimeSettings, args[1], force)
-      else:
-        writeCmdLineError($args)
+      cmdStop(runtimeSettings, cmdParseInfo)
     else:
       writeCmdLineError($args)
 
