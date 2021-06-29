@@ -58,16 +58,28 @@ proc initCgroupsSettings(longOptions: seq[CmdOption]): CgroupsSettgings =
   result = CgroupsSettgings()
 
   if longOptions.containsKey("cpulimit"):
-    result.cpu = true
-    result.cpuLimit = parseInt(longOptions["cpulimit"])
+    if longOptions["cpulimit"].len > 0:
+      result.cpu = true
+      result.cpuLimit = parseInt(longOptions["cpulimit"])
+    else:
+      echo "Error: Invalid value: --cpulimit"
+      quit()
 
   if longOptions.containsKey("cpucorelimit"):
-    result.cpuCore = true
-    result.cpuCoreLimit = parseInt(longOptions["cpucorelimit"])
+    if longOptions["cpucorelimit"].len > 0:
+      result.cpuCore = true
+      result.cpuCoreLimit = parseInt(longOptions["cpucorelimit"])
+    else:
+      echo "Error: Invalid value: --cpucorelimit"
+      quit()
 
   if longOptions.containsKey("memorylimit"):
-    result.memory = true
-    result.memoryLimit = parseInt(longOptions["memorylimit"])
+    if longOptions["memorylimit"].len > 0:
+      result.memory = true
+      result.memoryLimit = parseInt(longOptions["memorylimit"])
+    else:
+      echo "Error: Invalid value: --memorylimit"
+      quit()
 
 proc parseCommandLineOption*(): CmdParseInfo =
   var parsedLine = initOptParser()
