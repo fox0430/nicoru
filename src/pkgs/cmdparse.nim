@@ -183,8 +183,7 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       if not checkImageInLocal(image, tag, imagesDir, runtimeSettings.debug):
         pullImage(runtimeSettings, image, tag)
 
-      # TODO: Fix
-      let command = if args.len > 1: args[2 .. ^1] else: @["/bin/sh"]
+      let command = if args.len > 1: args[2 .. ^1] else: @[""]
 
       runContainer(
         runtimeSettings,
