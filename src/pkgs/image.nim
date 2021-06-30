@@ -252,7 +252,7 @@ proc pullImage*(settings: RuntimeSettings, repo, tag: string) =
   settings.updateImageDb(repo, tag, imageId)
 
 # Get all images in local
-proc getImageList(settings: RuntimeSettings, baseDir: string): seq[string] =
+proc getImageList(settings: RuntimeSettings): seq[string] =
   let
     dbPath = settings.databasePath()
 
@@ -264,8 +264,8 @@ proc getImageList(settings: RuntimeSettings, baseDir: string): seq[string] =
         result.add(fmt "{key} {id}")
 
 # Show all image in local
-proc writeImageList*(settings: RuntimeSettings, baseDir: string) =
-  let images = settings.getImageList(baseDir)
+proc writeImageList*(settings: RuntimeSettings) =
+  let images = settings.getImageList()
 
   echo "Repository:Tag\n"
   for image in images:
@@ -338,7 +338,7 @@ proc getRepoAndTagByimageId(settings: RuntimeSettings, imageId: string): ImageIn
         if strSplit.len == 2:
           return ImageInfo(repo: strSplit[0], tag: strSplit[1])
 
-proc removeImage*(settings: RuntimeSettings, layerDir, item: string) =
+proc removeImage*(settings: RuntimeSettings, item: string) =
   let
     imagesPath = settings.imagesPath()
     dbPath = settings.databasePath()
@@ -349,14 +349,13 @@ proc removeImage*(settings: RuntimeSettings, layerDir, item: string) =
     manifestJson = if isImageId: settings.getManifestByImageId(item)
                    else: settings.getManifestByRepo(item)
 
-  let  imageId = (manifestJson["config"]["digest"].getStr)[7 .. ^1]
+    imageId = shortId(manifestJson["config"]["digest"].getStr())
 
   for item in manifestJson["layers"]:
     let
-      digest = item["digest"].getStr
-      id = digest[7 .. ^1]
+      digest = item["digest"].getStr()
     block:
-      let path = layerDir / id
+      let path = settings.layerPath(digest)
       try:
         removeDir(path)
       except OSError:

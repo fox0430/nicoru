@@ -122,18 +122,19 @@ proc updateContainerConfigJson(config: ContainerConfig,
 
   writeFile(configPath, $json)
 
-proc initContainerConfig(baseDir, imageId, containerId, repo, tag: string,
+proc initContainerConfig(settings: RuntimeSettings, 
+                         imageId, containerId, repo, tag: string,
                          cgroups: CgroupsSettgings): ContainerConfig =
 
   let
-    blobPath = baseDir / "blobs" / imageId[7 .. ^1]
+    blobPath = settings.blobPath(imageId)
     blob = parseBlob(parseFile(blobPath))
 
   let
-    containerDir = baseDir / "containers" / containerId
-    configPath = containerDir / "config.json"
+    configPath = settings.containerConfigPath()
+
   if not fileExists(configPath):
-    let hostname = if blob.config.hostname.len > 0: blob.config.hostname
+    let hostname = if blob.config.hostname.len() > 0: blob.config.hostname
                    else: containerId
     result = ContainerConfig(containerId: containerId,
                              imageId: imageId,
@@ -152,12 +153,12 @@ proc putHostnameFile(containerId, path: string) =
   let hostname = containerId[0 .. 12]
   writeFile(path, hostname)
 
-proc setUplowerDir(layers: JsonNode, baseDir: string): string =
+proc setUplowerDir(settings: RuntimeSettings, layers: JsonNode): string =
   for i in 0 ..< layers.len:
     let
       blob = layers[i]["digest"].getStr
-      id = blob[7 .. blob.high]
-      layerDir = baseDir / "layer"
+      id = blob.shortId()
+      layerDir = settings.layerPath()
 
     if dirExists(layerDir / id):
       result &= layerDir / id
@@ -165,22 +166,22 @@ proc setUplowerDir(layers: JsonNode, baseDir: string): string =
       if i  < layers.len - 1:
         result &= ":"
 
-proc setOverlayfs(layers: JsonNode, baseDir: string, isRootless, debug: bool) =
+proc setOverlayfs(settings: RuntimeSettings, layers: JsonNode, isRootless: bool) =
   createDir("./upper")
   createDir("./work")
   createDir("./merged")
 
-  let lowerdir = setUplowerDir(layers, baseDir)
+  let lowerdir = settings.setUplowerDir(layers)
 
   if isRootless:
     # Fuse-overlayfs
     let
-      cmd = fmt "fuse-overlayfs -o lowerdir={lowerdir},upper=./upper,workdir=./work ./merged"
-    if debug: echo fmt "Debug: exec fuse-overlayfs: {cmd}"
+      cmd = fmt"fuse-overlayfs -o lowerdir={lowerdir},upper=./upper,workdir=./work ./merged"
+    if settings.debug: echo fmt "Debug: exec fuse-overlayfs: {cmd}"
 
     let exitCode = execShellCmd(cmd)
     if exitCode == 0:
-      if debug: echo fmt "Debug: fuse-overlayfs success"
+      if settings.debug: echo fmt "Debug: fuse-overlayfs success"
     else:
       echo fmt "Error: Falild to fuse-overlayfs: {exitCode}"
       quit()
@@ -191,8 +192,8 @@ proc setOverlayfs(layers: JsonNode, baseDir: string, isRootless, debug: bool) =
 
     mount("overlay", mergeDir, "overlay", MS_RELATIME, ovfs_opts)
 
-proc umountOverlayfs(rootfs: string, debug: bool) =
-  if debug: echo fmt "umount rootfs use \"fusermount3 -u {rootfs}\""
+proc umountOverlayfs(settings: RuntimeSettings, rootfs: string) =
+  if settings.debug: echo fmt "umount rootfs use \"fusermount3 -u {rootfs}\""
 
   let r = execCmdEx(fmt "fusermount3 -u {rootfs}")
   if r.exitCode == 0:
@@ -246,9 +247,9 @@ proc setupGidMap() =
 
   echo "after: " & readFile(path)
 
-proc createContainer*(repo, tag, baseDir, containersDir: string,
+proc createContainer*(settings: RuntimeSettings,
+                      repo, tag, containersDir: string,
                       cgroups: CgroupsSettgings,
-                      debug: bool,
                       command: seq[string]): ContainerConfig  =
 
   let containerId = $genOid()
@@ -260,13 +261,13 @@ proc createContainer*(repo, tag, baseDir, containersDir: string,
   let
     imagesDir = settings.imagesPath()
     dbPath = settings.databasePath()
-    imageId = getImageIdFromLocal(repo, tag, dbPath, debug)
+    imageId = settings.getImageIdFromLocal(repo, tag)
 
   let cDir = containersDir / containerId
   if not dirExists(cDir):
     createDir(cDir)
 
-  result = initContainerConfig(baseDir,
+  result = settings.initContainerConfig(
                                imageId,
                                containerId,
                                repo,
@@ -281,10 +282,11 @@ proc createContainer*(repo, tag, baseDir, containersDir: string,
 
   setCurrentDir(cDir)
 
-  if fileExists(baseDir / "images/sha256" / imageId[7 .. ^1]):
+  let
+    imgHashPath = settings.imagesHashPath()
+  if fileExists(imgHashPath / imageId[7 .. ^1]):
     let
-      imageDir = baseDir / "images/sha256"
-      manifestJson = parseFile(imageDir / imageId[7 .. ^1])
+      manifestJson = parseFile(imgHashPath / imageId[7 .. ^1])
 
 proc exitContainer(config: var ContainerConfig,
                    state: State,
@@ -333,13 +335,13 @@ proc execContainer*(settings: RuntimeSettings,
 
     if getpid() == 1:
       let
-        imageDir = settings.baseDir / "images/sha256"
-        manifestJson = parseFile(imageDir / imageId[7 .. ^1])
+        imageDir = settings.imagesHashPath()
+        manifestJson = parseFile(settings.imagesHashPath(imageId))
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
       const isRootless = false
-      setOverlayfs(manifestJson["layers"], settings.baseDir, isRootless, settings.debug)
+      settings.setOverlayfs(manifestJson["layers"], isRootless)
 
       let rootfs = containerDir / "merged"
       setCurrentDir(rootfs)
@@ -445,12 +447,11 @@ proc runContainer*(settings: RuntimeSettings,
                    repo, tag, containersDir: string,
                    command: seq[string]) =
 
-  var config = createContainer(repo,
+  var config = settings.createContainer(
+                               repo,
                                tag,
-                               settings.baseDir,
                                containersDir,
                                cgroupSettings,
-                               settings.debug,
                                command)
 
   if isRootUser():
