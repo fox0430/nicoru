@@ -2,7 +2,7 @@ import os, strformat, httpclient, json, asyncdispatch, strutils, osproc
 import settings
 
 type ImageInfo = object
-  repository: string
+  repo: string
   tag: string
 
 type ImageConfig* = object
@@ -78,8 +78,8 @@ proc extractTar(archive, directory: string) =
   setCurrentDir(currentDir)
 
 # Image list in local (json)
-proc updateImageDb(repo, tag, imageId, baseDir: string, debug: bool) =
-  let dbPath = baseDir / "images" / "repositorys.json"
+proc updateImageDb(settings: RuntimeSettings, repo, tag, imageId: string) =
+  let dbPath = settings.databasePath()
 
   if fileExists(dbPath):
     let json = %* {fmt"{repo}:{tag}": imageId}
@@ -90,7 +90,7 @@ proc updateImageDb(repo, tag, imageId, baseDir: string, debug: bool) =
     let json = %* {"Repository": {repo: {fmt"{repo}:{tag}": imageId}}}
     writeFile(dbPath, $json)
 
-  if debug: echo "Debug: Updated imagedb"
+  if settings.debug: echo "Debug: Updated imagedb"
 
 # Get token for docker hub
 proc getToken*(repo, tag: string): string =
@@ -197,13 +197,14 @@ proc getImageIdFromDockerHub*(repo, tag, token: string, debug: bool): string =
     if debug: echo fmt"Debug: Image Id: {result}"
 
 # Get image id from local
-proc getImageIdFromLocal*(repo, tag, imageDbPath: string, debug: bool): string =
-  if not fileExists(imageDbPath): return
+proc getImageIdFromLocal*(settings: RuntimeSettings, repo, tag: string): string =
+  let dbPath = settings.databasePath()
+  if not fileExists(dbPath): return
 
-  let dbJson = parseFile(imageDbPath)
+  let dbJson = parseFile(dbPath)
 
   result = dbJson["Repository"][repo][fmt"{repo}:{tag}"].getStr
-  if debug: echo fmt"Debug: Get image id from local: {result}"
+  if settings.debug: echo fmt"Debug: Get image id from local: {result}"
 
 # Get config.json (OCI bundle)
 proc getConfigV2*(repo, tag, imageId, token: string, debug: bool): JsonNode =
@@ -224,7 +225,7 @@ proc getConfigV2*(repo, tag, imageId, token: string, debug: bool): JsonNode =
 
 # Pulling docker images from docker hub
 proc pullImage*(settings: RuntimeSettings, repo, tag: string) =
-  let imageDir = settings.baseDir / "images"
+  let imageDir = settings.imagesPath()
 
   if settings.debug: echo fmt"Debug: Pulling image: {repo}:{tag}"
 
@@ -248,30 +249,31 @@ proc pullImage*(settings: RuntimeSettings, repo, tag: string) =
 
     waitFor getLayer(repo, tag, token, layerDir, manifestPath, settings.debug)
 
-  updateImageDb(repo, tag, imageId, settings.baseDir, settings.debug)
+  settings.updateImageDb(repo, tag, imageId)
 
 # Get all images in local
-proc getImageList(baseDir: string): seq[string] =
-  let imageDir = baseDir / "images"
+proc getImageList(settings: RuntimeSettings): seq[string] =
+  let
+    dbPath = settings.databasePath()
 
-  if fileExists(baseDir / "images/repositorys.json"):
-    let dbJson = parseFile(baseDir / "images/repositorys.json")
+  if fileExists(dbPath):
+    let dbJson = parseFile(dbPath)
     for key, val in dbJson["Repository"]:
       for key, item in val:
         let id = (item.getStr)[7 .. ^1]
         result.add(fmt "{key} {id}")
 
 # Show all image in local
-proc writeImageList*(baseDir: string) =
-  let images = getImageList(baseDir)
+proc writeImageList*(settings: RuntimeSettings) =
+  let images = settings.getImageList()
 
   echo "Repository:Tag\n"
   for image in images:
     echo image
 
-proc checkImageInLocal*(repo, tag, imagesDir: string, debug: bool): bool =
+proc checkImageInLocal*(settings: RuntimeSettings, repo, tag: string): bool =
   let
-    dbPath = imagesDir / "repositorys.json"
+    dbPath = settings.databasePath()
     image = fmt"{repo}:{tag}"
 
   if fileExists(dbPath):
@@ -282,19 +284,18 @@ proc checkImageInLocal*(repo, tag, imagesDir: string, debug: bool): bool =
   else:
     return false
 
-proc getImageId*(repo, tag, imagesDir: string, debug: bool): string =
-  if checkImageInLocal(repo, tag, imagesDir, debug):
-    let dbPath = imagesDir / "repositorys.json"
-    result = getImageIdFromLocal(repo, tag, dbPath, debug)
+proc getImageId*(settings: RuntimeSettings, repo, tag: string): string =
+  if settings.checkImageInLocal(repo, tag):
+    result = settings.getImageIdFromLocal(repo, tag)
   else:
     let token = getToken(repo, tag)
-    if debug: echo fmt"Debug: Get token: {token}"
+    if settings.debug: echo fmt"Debug: Get token: {token}"
 
-    result = getImageIdFromDockerHub(repo, tag, token, debug)
+    result = getImageIdFromDockerHub(repo, tag, token, settings.debug)
 
 # Get manifest file in local by image id
-proc getManifestByImageId(imagesDir, dbPath, item: string): JsonNode =
-  let dbJson = parseFile(dbPath)
+proc getManifestByImageId(settings: RuntimeSettings, item: string): JsonNode =
+  let dbJson = parseFile(settings.databasePath())
   for repo, node in dbJson["Repository"]:
     for repoAndTag, val in node:
       let
@@ -302,12 +303,12 @@ proc getManifestByImageId(imagesDir, dbPath, item: string): JsonNode =
         id = valStr[7 .. ^1]
 
       if id == item:
-        let manifestPath = imagesDir / "sha256" / id
+        let manifestPath = settings.imagesHashPath() / id
         return parseFile(manifestPath)
 
-proc getManifestByRepo(imagesDir, dbPath, item: string): JsonNode =
+proc getManifestByRepo(settings: RuntimeSettings, item: string): JsonNode =
   let
-    dbJson = parseFile(dbPath)
+    dbJson = parseFile(settings.databasePath())
     repo = if item.contains(":"): (item.split(":"))[0]
            else: item
     tag = if item.contains(":"): (item.split(":"))[1]
@@ -320,13 +321,12 @@ proc getManifestByRepo(imagesDir, dbPath, item: string): JsonNode =
         id = valStr[7 .. ^1]
 
       if repoAndTag == item:
-        let manifestPath = imagesDir / "sha256" / id
+        let manifestPath = settings.imagesHashPath() / id
         return parseFile(manifestPath)
 
-proc getRepoAndTagByimageId(
-  imagesDir, dbPath, imageId: string): (string, string) =
+proc getRepoAndTagByimageId(settings: RuntimeSettings, imageId: string): ImageInfo =
 
-  let dbJson = parseFile(dbPath)
+  let dbJson = parseFile(settings.databasePath())
   for repo, node in dbJson["Repository"]:
     for repoAndTag, val in node:
       let
@@ -336,26 +336,26 @@ proc getRepoAndTagByimageId(
       if id == imageId:
         let strSplit = repoAndTag.split(":")
         if strSplit.len == 2:
-          return (strSplit[0], strSplit[1])
+          return ImageInfo(repo: strSplit[0], tag: strSplit[1])
 
-proc removeImage*(imagesDir, layerDir, item: string) =
+proc removeImage*(settings: RuntimeSettings, item: string) =
   let
-    dbPath = imagesDir / "repositorys.json"
+    imagesPath = settings.imagesPath()
+    dbPath = settings.databasePath()
     dbJson = parseFile(dbPath)
 
     isImageId = not item.contains(":")
 
-    manifestJson = if isImageId: getManifestByImageId(imagesDir, dbPath, item)
-                   else: getManifestByRepo(imagesDir, dbPath, item)
+    manifestJson = if isImageId: settings.getManifestByImageId(item)
+                   else: settings.getManifestByRepo(item)
 
-  let  imageId = (manifestJson["config"]["digest"].getStr)[7 .. ^1]
+    imageId = shortId(manifestJson["config"]["digest"].getStr())
 
   for item in manifestJson["layers"]:
     let
-      digest = item["digest"].getStr
-      id = digest[7 .. ^1]
+      digest = item["digest"].getStr()
     block:
-      let path = layerDir / id
+      let path = settings.layerPath(digest)
       try:
         removeDir(path)
       except OSError:
@@ -364,7 +364,7 @@ proc removeImage*(imagesDir, layerDir, item: string) =
 
   # Remove manifest
   block:
-    let path = imagesDir / imageId
+    let path = imagesPath / imageId
     try:
       removeFile(path)
     except OSError:
@@ -372,12 +372,12 @@ proc removeImage*(imagesDir, layerDir, item: string) =
       return
 
   # Update DB
-  let (repo, tag) = getRepoAndTagByimageId(imagesDir, dbPath, imageId)
+  let info = settings.getRepoAndTagByimageId(imageId)
   var newJson = dbJson
-  if newJson["Repository"][repo].len == 1:
-    newJson["Repository"].delete(repo)
+  if newJson["Repository"][info.repo].len == 1:
+    newJson["Repository"].delete(info.repo)
   else:
-    newJson["Repository"][repo].delete(fmt "{repo}:{tag}")
+    newJson["Repository"][info.repo].delete(fmt "{info.repo}:{info.tag}")
 
   try:
     writeFile(dbPath, $newJson)

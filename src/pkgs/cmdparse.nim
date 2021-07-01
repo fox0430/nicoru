@@ -139,7 +139,7 @@ proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   if isHelp(args, cmdParseInfo.shortOptions):
     writeImageHelpMessage()
   elif args.len == 1:
-    writeImageList(runtimeSettings.baseDir)
+    runtimeSettings.writeImageList()
   else:
     writeCmdLineError($args)
 
@@ -160,14 +160,13 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
       imageAndTag = parseImageAndTag(args[1])
 
-      containerId = createContainer(
-        imageAndTag[0],
-        imageAndTag[1],
-        runtimeSettings.baseDir,
-        containerDir,
-        cgroupSettings,
-        runtimeSettings.debug,
-        command)
+      containerId =
+        runtimeSettings.createContainer(
+          imageAndTag[0],
+          imageAndTag[1],
+          containerDir,
+          cgroupSettings,
+          command)
   else:
     writeCmdLineError($args)
 
@@ -192,8 +191,8 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
         image = imageAndTag[0]
         tag = imageAndTag[1]
 
-      if not checkImageInLocal(image, tag, imagesDir, runtimeSettings.debug):
-        pullImage(runtimeSettings, image, tag)
+      if not runtimeSettings.checkImageInLocal(image, tag):
+        runtimeSettings.pullImage(image, tag)
 
       let command = if args.len > 1: args[2 .. ^1] else: @[""]
 
@@ -240,10 +239,8 @@ proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeNotEnoughArgError("rmi", 1)
   elif args.len == 2:
     let
-      imagesDir = runtimeSettings.baseDir / "images"
-      layerDir = runtimeSettings.baseDir / "layer"
       image = args[1]
-    removeImage(imagesDir, layerDir, image)
+    runtimeSettings.removeImage(image)
   else:
     writeCmdLineError($args)
 

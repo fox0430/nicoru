@@ -13,12 +13,13 @@ suite "Update image DB":
       repo = $genOid()
       tag = $genOid()
       id = $genOid()
-    const debug = false
+      debug = false
+      settings = RuntimeSettings(baseDir: baseDir, debug: debug)
 
-    updateImageDb(repo, tag, id, baseDir, debug)
+    settings.updateImageDb(repo, tag, id)
 
     let
-      dbPath = baseDir / "images" / "repositorys.json"
+      dbPath = baseDir / "images" / "repositories.json"
       dbJson = parseFile(dbPath)
 
     check dbJson == %* {"Repository":{repo:{fmt "{repo}:{tag}": id}}}
@@ -38,18 +39,20 @@ suite "Update image DB":
       repo = $genOid()
       tag = $genOid()
       id = $genOid()
+      settings = RuntimeSettings(baseDir: baseDir, debug: debug)
+
     # Create new DB
-    updateImageDb(repo, tag, id, baseDir, debug)
+    settings.updateImageDb(repo, tag, id)
 
     let
       repo2 = $genOid()
       tag2 = $genOid()
       id2 = $genOid()
     # Update DB
-    updateImageDb(repo2, tag2, id2, baseDir, debug)
+    settings.updateImageDb(repo2, tag2, id2)
 
     let
-      dbPath = baseDir / "images" / "repositorys.json"
+      dbPath = baseDir / "images" / "repositories.json"
       dbJson = parseFile(dbPath)
 
     check dbJson == %* {"Repository":{repo:{fmt "{repo}:{tag}": id}, repo2:{fmt "{repo2}:{tag2}": id2}}}
