@@ -38,5 +38,5 @@ proc layerPath*(settings: RuntimeSettings): string =
 proc layerPath*(settings: RuntimeSettings, blob: string): string =
   return settings.baseDir / "layer" / shortId(blob)
 
-proc containerConfigPath*(settings: RuntimeSettings): string =
-  return settings.containersPath() / "config.json"
+proc containerConfigPath*(settings: RuntimeSettings, containerId: string): string =
+  return settings.containersPath() / containerId / "config.json"

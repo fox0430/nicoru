@@ -131,7 +131,7 @@ proc initContainerConfig(settings: RuntimeSettings,
     blob = parseBlob(parseFile(blobPath))
 
   let
-    configPath = settings.containerConfigPath()
+    configPath = settings.containerConfigPath(containerId)
 
   if not fileExists(configPath):
     let hostname = if blob.config.hostname.len() > 0: blob.config.hostname
