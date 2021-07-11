@@ -185,7 +185,7 @@ proc pipe2*(fd: array[0..1, cint], flags: int) =
 
 proc setEnv*(name, value: string, overwrite: int) =
   let exitCode = setenv(cstring(name), cstring(value), cint(overwrite))
-  if exitCode < 0: echo fmt "Failed setenv: {exitCode}"
+  if exitCode < 0: exception(fmt "Failed setenv: {exitCode}")
 
 proc execv*(command: seq[string]) =
   let
@@ -194,4 +194,4 @@ proc execv*(command: seq[string]) =
            else: allocCStringArray(@[command[0]])
 
   let exitCode = execv(cmd, args)
-  if exitCode < 0: echo fmt "Failed execv: {exitCode}"
+  if exitCode < 0: exception(fmt "Failed execv: {exitCode}")

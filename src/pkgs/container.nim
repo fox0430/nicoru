@@ -122,7 +122,7 @@ proc updateContainerConfigJson(config: ContainerConfig,
 
   writeFile(configPath, $json)
 
-proc initContainerConfig(settings: RuntimeSettings, 
+proc initContainerConfig(settings: RuntimeSettings,
                          imageId, containerId, repo, tag: string,
                          cgroups: CgroupsSettgings): ContainerConfig =
 
@@ -305,6 +305,10 @@ proc setEnv(envs: seq[string]) =
   for env in envs:
     let
       envSplit  = env.split("=")
+    if envSplit.len != 2:
+      exception(fmt "Error: config.env is invalid {envs}")
+
+    let
       name = envSplit[0]
       value = envSplit[1]
     setenv(name, value, 1)
@@ -499,7 +503,7 @@ proc getContainerConfig(containesrsDir, containerId: string): ContainerConfig =
         of "Env":
           for item in json[key]:  result.env.add item.getStr
         of "Cmd":
-          for item in json[key]:  result.env.add item.getStr
+          for item in json[key]:  result.cmd.add item.getStr
         else:
           discard
 
@@ -507,6 +511,13 @@ proc startContainer*(settings: RuntimeSettings,
                      containersDir, containerId: string) =
 
   var config = getContainerConfig(containersDir, containerId)
+
+  let imageId = settings.getImageIdFromLocal(config.repo, config.tag)
+  if imageId.len > 0:
+    config.imageId = imageId
+  else:
+    echo "Error: Not found image in local"
+    quit()
 
   if dirExists(containersDir / config.containerId):
     chdir(containersDir / config.containerId)
