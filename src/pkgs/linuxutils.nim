@@ -190,8 +190,7 @@ proc setEnv*(name, value: string, overwrite: int) =
 proc execv*(command: seq[string]) =
   let
     cmd = cstring(command[0])
-    args = if command.len > 1: allocCStringArray(command[1 .. ^1])
-           else: allocCStringArray(@[command[0]])
+    args = allocCStringArray(command)
 
   let exitCode = execv(cmd, args)
   if exitCode < 0: exception(fmt "Failed execv: {exitCode}")
