@@ -18,14 +18,11 @@ type ImageConfig* = object
   env*: seq[string]
   cmd*: seq[string]
   image*: string
-  # TODO*: Check type
-  volumes*: string
+  volumes*: seq[string]
   workingDir*: string
-  # TODO*: Check type
-  entrypoint*: string
-  # TODO*: Check type
+  entrypoint*: seq[string]
+  # TODO: check type
   onBuild*: string
-  # TODO*: Check type
   labels*: string
 
 type ContainerConfig = object
@@ -39,17 +36,13 @@ type ContainerConfig = object
   openStdin*: bool
   stdinOnce*: bool
   env*: seq[string]
-  # TODO*: Check type
   cmd*: seq[string]
   image*: string
-  # TODO*: Check type
-  volumes*: string
+  volumes*: seq[string]
   workingDir*: string
-  # TODO*: Check type
-  entrypoint*: string
-  # TODO*: Check type
+  entrypoint*: seq[string]
+  # TODO: check type
   onBuild*: string
-  # TODO*: Check type
   labels*: string
 
 type ImageRootFs = object
@@ -63,7 +56,6 @@ type Blob = object
   containerConfig*: ContainerConfig
   created*: string
   dockerVersion*: string
-  # TODO*: Check type
   history*: seq[string]
   os*: string
   rootfs*: ImageRootFs
@@ -416,12 +408,16 @@ proc parseImageConfig(configJson: JsonNode): ImageConfig =
       of "Image":
         result.image = val.getStr
       of "Volumes":
-        result.volumes = val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.volumes.add val.getStr
       of "WorkingDir":
         result.workingDir = val.getStr
       of "Entrypoint":
-        result.entrypoint = val.getStr
-      of "OnBuild":
+        if $val != "null":
+          for val in configJson[key]:
+            result.entrypoint.add val.getStr
+      of "onBuild":
         result.onBuild = val.getStr
       of "Labels":
         result.labels = val.getStr
@@ -458,12 +454,16 @@ proc parseContainerConfig(configJson: JsonNode): ContainerConfig =
       of "Image":
         result.image = val.getStr
       of "Volumes":
-        result.volumes = val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.volumes.add val.getStr
       of "WorkingDir":
         result.workingDir = val.getStr
       of "Entrypoint":
-        result.entrypoint = val.getStr
-      of "OnBuild":
+        if $val != "null":
+          for val in configJson[key]:
+            result.entrypoint.add val.getStr
+      of "onBuild":
         result.onBuild = val.getStr
       of "Labels":
         result.labels = val.getStr
