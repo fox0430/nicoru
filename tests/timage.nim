@@ -79,9 +79,9 @@ suite "Image blob (layer)":
     check blob.config.env == @["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]
     check blob.config.cmd == @["sh"]
     check blob.config.image == "sha256:bbb267d519febe6fbc3db198c29806127961535bce09bc940ec6903b4efdf511"
-    check blob.config.volumes == ""
+    check blob.config.volumes.len == 0
     check blob.config.workingDir == ""
-    check blob.config.entrypoint == ""
+    check blob.config.entrypoint.len == 0
     check blob.config.onBuild == ""
     check blob.config.labels == ""
 
@@ -96,9 +96,9 @@ suite "Image blob (layer)":
     check not blob.containerConfig.tty
     check not blob.containerConfig.stdinOnce
     check blob.containerConfig.image == "sha256:bbb267d519febe6fbc3db198c29806127961535bce09bc940ec6903b4efdf511"
-    check blob.containerConfig.volumes == ""
+    check blob.containerConfig.volumes.len == 0
     check blob.containerConfig.workingDir == ""
-    check blob.containerConfig.entrypoint == ""
+    check blob.containerConfig.entrypoint.len == 0
     check blob.containerConfig.onBuild == ""
     check blob.containerConfig.labels == ""
 
