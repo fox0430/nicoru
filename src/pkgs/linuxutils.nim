@@ -187,10 +187,10 @@ proc setEnv*(name, value: string, overwrite: int) =
   let exitCode = setenv(cstring(name), cstring(value), cint(overwrite))
   if exitCode < 0: exception(fmt "Failed setenv: {exitCode}")
 
-proc execv*(command: seq[string]) =
+proc execvp*(command: seq[string]) =
   let
     cmd = cstring(command[0])
     args = allocCStringArray(command)
 
-  let exitCode = execv(cmd, args)
+  let exitCode = execvp(cmd, args)
   if exitCode < 0: exception(fmt "Failed execv: {exitCode}")

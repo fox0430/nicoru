@@ -409,7 +409,7 @@ proc execContainer*(settings: RuntimeSettings,
       setEnv(config.env)
 
       try:
-        execv(config.cmd)
+        execvp(config.cmd)
       except:
         echo "Error execute command failed"
         quit(1)
