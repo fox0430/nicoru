@@ -408,13 +408,15 @@ proc parseImageConfig(configJson: JsonNode): ImageConfig =
       of "Image":
         result.image = val.getStr
       of "Volumes":
-        if val in configJson[key]:
-          result.volumes.add val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.volumes.add val.getStr
       of "WorkingDir":
         result.workingDir = val.getStr
       of "Entrypoint":
-        if val in configJson[key]:
-          result.entrypoint.add val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.entrypoint.add val.getStr
       of "onBuild":
         result.onBuild = val.getStr
       of "Labels":
@@ -452,13 +454,15 @@ proc parseContainerConfig(configJson: JsonNode): ContainerConfig =
       of "Image":
         result.image = val.getStr
       of "Volumes":
-        for val in configJson[key]:
-          result.volumes.add val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.volumes.add val.getStr
       of "WorkingDir":
         result.workingDir = val.getStr
       of "Entrypoint":
-        for val in configJson[key]:
-          result.entrypoint.add val.getStr
+        if $val != "null":
+          for val in configJson[key]:
+            result.entrypoint.add val.getStr
       of "onBuild":
         result.onBuild = val.getStr
       of "Labels":
