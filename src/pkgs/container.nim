@@ -1,6 +1,6 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils
 import image, linuxutils, settings, cgroups
-import libseccomp/seccomp
+import seccomp/seccomp
 
 type State = enum
   running
@@ -18,6 +18,8 @@ type ContainerConfig = object
   env: seq[string]
   cmd: seq[string]
   cgroups: CgroupsSettgings
+  # TODO: Delete
+  isSysCallFilter: bool
 
 proc checkContainerState(json: JsonNode): State =
   for key, item in json["State"]:
@@ -409,10 +411,9 @@ proc execContainer*(settings: RuntimeSettings,
 
       setEnv(config.env)
 
-      # TODO: Fix
-      let ctx = seccomp_ctx(Allow)
-      ctx.add_rule(Kill, "reboot")
-      ctx.load()
+      # seccomp
+      if config.isSysCallFilter:
+        setSysCallFiler()
 
       try:
         execvp(config.cmd)
