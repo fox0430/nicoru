@@ -1,5 +1,6 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils
 import image, linuxutils, settings, cgroups
+import seccomp/seccomp
 
 type State = enum
   running
@@ -407,6 +408,11 @@ proc execContainer*(settings: RuntimeSettings,
       setHostname(config.hostname)
 
       setEnv(config.env)
+
+      # TODO: Fix
+      let ctx = seccomp_ctx(Allow)
+      ctx.add_rule(Kill, "reboot")
+      ctx.load()
 
       try:
         execvp(config.cmd)
