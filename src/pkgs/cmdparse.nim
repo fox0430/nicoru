@@ -155,18 +155,16 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       command = if args.len > 1: args[2 .. ^1] else: @[""]
 
       cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
-      imagesDir = runtimeSettings.baseDir / "images"
       containerDir = runtimeSettings.baseDir / "containers"
 
       imageAndTag = parseImageAndTag(args[1])
 
-      containerId =
-        runtimeSettings.createContainer(
-          imageAndTag[0],
-          imageAndTag[1],
-          containerDir,
-          cgroupSettings,
-          command)
+    discard runtimeSettings.createContainer(
+      imageAndTag[0],
+      imageAndTag[1],
+      containerDir,
+      cgroupSettings,
+      command)
   else:
     writeCmdLineError($args)
 
@@ -183,7 +181,6 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       runtimeSettings.background = true
     if args.len > 1:
       let
-        imagesDir = runtimeSettings.baseDir / "images"
         containersDir = runtimeSettings.baseDir / "containers"
 
         imageAndTag = parseImageAndTag(args[1])
@@ -298,9 +295,7 @@ proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 proc checkArgments*(runtimeSettings: var RuntimeSettings,
                     cmdParseInfo: CmdParseInfo) =
 
-  let
-    longOptions = cmdParseInfo.longOptions
-    shortOptions = cmdParseInfo.shortOptions
+  let longOptions = cmdParseInfo.longOptions
   if longOptions.len > 0 and longOptions.containsKey("debug"):
     runtimeSettings.debug = true
 

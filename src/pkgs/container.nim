@@ -258,10 +258,7 @@ proc createContainer*(settings: RuntimeSettings,
 
   createDir(containersDir)
 
-  let
-    imagesDir = settings.imagesPath()
-    dbPath = settings.databasePath()
-    imageId = settings.getImageIdFromLocal(repo, tag)
+  let imageId = settings.getImageIdFromLocal(repo, tag)
 
   let cDir = containersDir / containerId
   if not dirExists(cDir):
@@ -317,11 +314,7 @@ proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
                     containersDir: string) =
 
-  let
-    repo = config.repo
-    tag = config.tag
-    dbPath = settings.imagesPath()
-    imageId = config.imageId
+  let imageId = config.imageId
 
   # TODO: Fix name
   let
@@ -338,9 +331,7 @@ proc execContainer*(settings: RuntimeSettings,
     let secondForkPid = fork()
 
     if getpid() == 1:
-      let
-        imageDir = settings.imagesHashPath()
-        manifestJson = parseFile(settings.imagesHashPath(imageId))
+      let manifestJson = parseFile(settings.imagesHashPath(imageId))
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
