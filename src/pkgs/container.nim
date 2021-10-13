@@ -1,5 +1,4 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils
-import seccomp
 import image, linuxutils, settings, cgroups, seccomputils
 
 type State = enum

@@ -1,6 +1,11 @@
 import pkgs/[settings, cmdparse]
 
+include pkgs/seccomputils
+
 when isMainModule:
+  discard loadProfile("")
+
+
   var runtimeSettings = initRuntimeSetting()
   let cmdParseInfo = parseCommandLineOption()
 
