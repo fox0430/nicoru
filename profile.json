@@ -2,6 +2,7 @@
 	"defaultAction": "SCMP_ACT_ERRNO",
 	"syscalls": [
 		{
+			"action": "SCMP_ACT_ALLOW",
 			"names": [
 				"accept",
 				"accept4",
@@ -343,7 +344,7 @@
 				"waitpid",
 				"write",
 				"writev"
-			],
-			"action": "SCMP_ACT_ALLOW"
+			]
 		}
+  ]
 }
