@@ -1,6 +1,6 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils
-import image, linuxutils, settings, cgroups
-import seccomp/seccomp
+import seccomp
+import image, linuxutils, settings, cgroups, seccomputils
 
 type State = enum
   running

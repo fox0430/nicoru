@@ -1,6 +1,6 @@
 import json
 import os
-import libseccomp/seccomp
+import seccomp
 
 type SyscallSetting = object
   name: string
@@ -11,7 +11,7 @@ type SeccompSetting = object
   syscall: seq[SyscallSetting]
 
 proc defaultProfile(): string {.compiletime.} =
-  readFile(currentSourcePath.parentDir() / "profile.json")
+  readFile(currentSourcePath.parentDir() / "../../profile.json")
 
 proc loadProfile(path: string): SeccompSetting =
   # TODO: Add error handle
