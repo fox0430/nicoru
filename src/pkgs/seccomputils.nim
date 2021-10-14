@@ -34,7 +34,7 @@ proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
     result.action = action
 
 # Load prfile for Seccomp and init SeccompSetting and SyscallSetting
-proc initSyscallSetting(profile: JsonNode): SeccompSetting =
+proc initSeccompSetting(profile: JsonNode): SeccompSetting =
   for item in profile.pairs:
     case item.key:
       of "defaultAction":
@@ -78,7 +78,7 @@ proc loadProfile(path: string = ""): JsonNode =
 proc setSysCallFiler*(profilePath: string = "") =
   let
     profile = loadProfile(profilePath)
-    seccompSetting = initSysCallSetting(profile)
+    seccompSetting = initSeccompSetting(profile)
     ctx = seccomp_ctx(seccompSetting.defaultAction)
 
   if seccompSetting.syscall.len > 0:
