@@ -61,3 +61,14 @@ suite "Seccomp":
         for name in syscallProfile["names"].items:
           let syscallSetting = setting.searchSyscallSetting($name)
           check syscallSetting.action == action
+
+  test "Load and init profile 2":
+    let profileJson = parseJson("""
+{
+  "defaultAction": "ERRNO"
+}""")
+
+    let
+      setting = initSeccompSetting(profileJson)
+      defaultAction = profileJson["defaultAction"].getStr.toAction
+    check setting.defaultAction == defaultAction
