@@ -10,6 +10,7 @@ type SeccompSetting = object
   defaultAction: ScmpAction
   syscall: seq[SyscallSetting]
 
+# Load a default prfile for Seccomp in compile time
 proc defaultProfile(): string {.compiletime.} =
   readFile(currentSourcePath.parentDir() / "../../profile.json")
 
@@ -29,11 +30,12 @@ proc toAction(action: string): ScmpAction =
     else:
       exception(fmt"Seccomp: Invalid Action {action}")
 
-proc setSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
+proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
   if name.len > 0:
     result.name = name
     result.action = action
 
+# Load prfile for Seccomp and init SeccompSetting and SyscallSetting
 proc loadProfile(path: string = ""): SeccompSetting =
   # TODO: Add error handle
   let profile = if path.len > 0: readFile(path)
@@ -56,10 +58,11 @@ proc loadProfile(path: string = ""): SeccompSetting =
             action = toAction(item["action"].getStr)
 
           for name in item["names"].items:
-            result.syscall.add setSysCallSetting($name, action)
+            result.syscall.add initSysCallSetting($name, action)
       else:
         exception(fmt"Seccomp: Invalid profile: Invalid item: {item.key}")
 
+# Set system call filter using Seccomp
 proc setSysCallFiler*(profilePath: string = "") =
   let
     seccompSetting = loadProfile(profilePath)
