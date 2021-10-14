@@ -2,17 +2,12 @@ import json, os, strformat
 import seccomp
 import linuxutils
 
-type SeccompAction = enum
-  SCMP_ACT_ALLOW
-  SCMP_ACT_ERRNO
-
 type SyscallSetting = object
   name: string
-  action: SeccompAction
+  action: ScmpAction
 
 type SeccompSetting = object
-  enable: bool
-  defaultAction: SeccompAction
+  defaultAction: ScmpAction
   syscall: seq[SyscallSetting]
 
 proc defaultProfile(): string {.compiletime.} =
@@ -25,21 +20,21 @@ proc isAction(action: string): bool =
     else:
       false
 
-proc toAction(action: string): SeccompAction =
+proc toAction(action: string): ScmpAction =
   case action:
     of "SCMP_ACT_ALLOW":
-      result = SeccompAction.SCMP_ACT_ALLOW
+      result = ScmpAction.Allow
     of "SCMP_ACT_ERRNO":
-      result = SeccompAction.SCMP_ACT_ERRNO
+      result = ScmpAction.Trap
     else:
       exception(fmt"Seccomp: Invalid Action {action}")
 
-proc setSysCallSetting(name: string, action: SeccompAction): SyscallSetting =
+proc setSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
   if name.len > 0:
     result.name = name
     result.action = action
 
-proc loadProfile(path: string): SeccompSetting =
+proc loadProfile(path: string = ""): SeccompSetting =
   # TODO: Add error handle
   let profile = if path.len > 0: readFile(path)
                 else: defaultProfile()
@@ -65,14 +60,13 @@ proc loadProfile(path: string): SeccompSetting =
       else:
         exception(fmt"Seccomp: Invalid profile: Invalid item: {item.key}")
 
-# TODO: Add option
-proc setSysCallFiler*() =
+proc setSysCallFiler*(profilePath: string = "") =
   let
-    # TODO: Change to KIll or Errono
-    ctx = seccomp_ctx(Allow)
+    seccompSetting = loadProfile(profilePath)
+    ctx = seccomp_ctx(seccompSetting.defaultAction)
 
-  #for syscall in syscallList:
-  #  ctx.add_rule(Kill, syscall)
+  if seccompSetting.syscall.len > 0:
+    for syscall in seccompSetting.syscall:
+      ctx.add_rule(syscall.action, syscall.name)
 
-  #if sysCallList.len > 0:
-  #  ctx.load()
+    ctx.load()
