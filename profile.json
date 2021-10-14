@@ -1,8 +1,8 @@
 {
-	"defaultAction": "SCMP_ACT_ERRNO",
+	"defaultAction": "ERRNO",
 	"syscalls": [
 		{
-			"action": "SCMP_ACT_ALLOW",
+			"action": "ALLOW",
 			"names": [
 				"accept",
 				"accept4",

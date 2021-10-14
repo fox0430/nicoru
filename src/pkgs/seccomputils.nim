@@ -16,17 +16,19 @@ proc defaultProfile(): string {.compiletime.} =
 
 proc isAction(action: string): bool =
   case action:
-    of "SCMP_ACT_ALLOW", "SCMP_ACT_ERRNO":
+    of "ALLOW", "ERRNO", "KILL":
       true
     else:
       false
 
 proc toAction(action: string): ScmpAction =
   case action:
-    of "SCMP_ACT_ALLOW":
+    of "ALLOW":
       result = ScmpAction.Allow
-    of "SCMP_ACT_ERRNO":
+    of "ERRNO":
       result = ScmpAction.Trap
+    of "KILL":
+      result = ScmpAction.Kill
     else:
       exception(fmt"Seccomp: Invalid Action {action}")
 
