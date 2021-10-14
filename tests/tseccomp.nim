@@ -14,7 +14,7 @@ suite "Seccomp":
   test "Load and init a default profile":
     let
       profile = loadProfile("./default_seccomp_profile.json")
-      setting = initSysCallSetting(profile)
+      setting = initSeccompSetting(profile)
 
       defaultProfileStr = readFile("./default_seccomp_profile.json")
       defaultProfileJson = parseJson(defaultProfileStr)
@@ -42,14 +42,14 @@ suite "Seccomp":
     },
     {
       "action": "KILL",
-      "name": [
+      "names": [
         "access"
       ]
     }
   ]
 }""")
 
-    let setting = initSysCallSetting(profileJson)
+    let setting = initSeccompSetting(profileJson)
 
     block:
       let defaultAction = profileJson["defaultAction"].getStr.toAction
