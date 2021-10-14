@@ -10,10 +10,6 @@ type SeccompSetting = object
   defaultAction: ScmpAction
   syscall: seq[SyscallSetting]
 
-# Load a default prfile for Seccomp in compile time
-proc defaultProfile(): string {.compiletime.} =
-  readFile(currentSourcePath.parentDir() / "../../default_seccomp_profile.json")
-
 proc isAction(action: string): bool =
   case action:
     of "ALLOW", "ERRNO", "KILL":
@@ -38,15 +34,8 @@ proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
     result.action = action
 
 # Load prfile for Seccomp and init SeccompSetting and SyscallSetting
-proc loadProfile(path: string = ""): SeccompSetting =
-  let profile = if path.len > 0:
-                  try: readFile(path)
-                  except IOError: echo fmt"Seccomp: Filed to load profile. {path}"
-                else: defaultProfile()
-
-  let json = parseJson(profile)
-
-  for item in json.pairs:
+proc initSyscallSetting(profile: JsonNode): SeccompSetting =
+  for item in profile.pairs:
     case item.key:
       of "defaultAction":
         if isAction(item.val.getStr):
@@ -65,10 +54,31 @@ proc loadProfile(path: string = ""): SeccompSetting =
       else:
         exception(fmt"Seccomp: Invalid profile: Invalid item: {item.key}")
 
+# Load a default prfile for Seccomp in compile time
+proc defaultProfile(): string {.compiletime.} =
+  readFile(currentSourcePath.parentDir() / "../../default_seccomp_profile.json")
+
+proc loadProfile(path: string = ""): JsonNode =
+  var profile = ""
+  if path.len > 0:
+    try:
+      profile = readFile(path)
+    except IOError:
+      echo fmt"Seccomp: Filed to load profile. {path}"
+  else:
+    profile = defaultProfile()
+
+  try:
+    result = parseJson(profile)
+  except:
+    echo "Seccomp: Filed to parse json"
+
+
 # Set system call filter using Seccomp
 proc setSysCallFiler*(profilePath: string = "") =
   let
-    seccompSetting = loadProfile(profilePath)
+    profile = loadProfile(profilePath)
+    seccompSetting = initSysCallSetting(profile)
     ctx = seccomp_ctx(seccompSetting.defaultAction)
 
   if seccompSetting.syscall.len > 0:
