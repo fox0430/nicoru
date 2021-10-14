@@ -39,8 +39,9 @@ proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
 
 # Load prfile for Seccomp and init SeccompSetting and SyscallSetting
 proc loadProfile(path: string = ""): SeccompSetting =
-  # TODO: Add error handle
-  let profile = if path.len > 0: readFile(path)
+  let profile = if path.len > 0:
+                  try: readFile(path)
+                  except IOError: echo fmt"Seccomp: Filed to load profile. {path}"
                 else: defaultProfile()
 
   let json = parseJson(profile)
