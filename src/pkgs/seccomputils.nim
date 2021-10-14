@@ -35,24 +35,16 @@ proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
 
 # Load prfile for Seccomp and init SeccompSetting and SyscallSetting
 proc initSeccompSetting(profile: JsonNode): SeccompSetting =
-  for item in profile.pairs:
-    case item.key:
-      of "defaultAction":
-        if isAction(item.val.getStr):
-          result.defaultAction = toAction(item.val.getStr)
+  if profile.contains("defaultAction"):
+    let val = profile["defaultAction"].getStr
+    if isAction(val):
+      result.defaultAction = toAction(val)
 
-      of "syscalls":
-        let syscallsJson = item.val
-        var action = result.defaultAction
-
-        for item in syscallsJson.items:
-          if isAction(item["action"].getStr):
-            action = toAction(item["action"].getStr)
-
-          for name in item["names"].items:
-            result.syscall.add initSysCallSetting($name, action)
-      else:
-        exception(fmt"Seccomp: Invalid profile: Invalid item: {item.key}")
+  if profile.contains("syscalls"):
+    for item in profile["syscalls"].items:
+      let action = item["action"].getStr.toAction
+      for name in item["names"].items:
+        result.syscall.add initSysCallSetting($name, action)
 
 # Load a default prfile for Seccomp in compile time
 proc defaultProfile(): string {.compiletime.} =
