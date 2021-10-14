@@ -12,7 +12,7 @@ type SeccompSetting = object
 
 # Load a default prfile for Seccomp in compile time
 proc defaultProfile(): string {.compiletime.} =
-  readFile(currentSourcePath.parentDir() / "../../profile.json")
+  readFile(currentSourcePath.parentDir() / "../../default_seccomp_profile.json")
 
 proc isAction(action: string): bool =
   case action:
