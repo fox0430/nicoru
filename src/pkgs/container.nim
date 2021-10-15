@@ -17,8 +17,6 @@ type ContainerConfig = object
   env: seq[string]
   cmd: seq[string]
   cgroups: CgroupsSettgings
-  # TODO: Delete
-  isSysCallFilter: bool
 
 proc checkContainerState(json: JsonNode): State =
   for key, item in json["State"]:
