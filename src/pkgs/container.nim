@@ -409,7 +409,7 @@ proc execContainer*(settings: RuntimeSettings,
       setEnv(config.env)
 
       # seccomp
-      if config.isSysCallFilter:
+      if settings.seccomp:
         let path = if settings.seccompProfilePath.len > 0:
                      settings.seccompProfilePath
                     else:
