@@ -4,6 +4,8 @@ type RuntimeSettings* = object
   baseDir*: string
   debug*: bool
   background*: bool
+  seccomp*: bool
+  seccompProfilePath*: string
 
 proc initRuntimeSetting*(): RuntimeSettings =
   result.baseDir = getHomeDir() / ".local/share/nicoru"

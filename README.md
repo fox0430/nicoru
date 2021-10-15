@@ -14,6 +14,8 @@ NOTE: Work in progress.
 
 - Management of container/image
 
+- Seccomp
+
 ## Installation
 
 nicoru can run on only GNU/Linux
