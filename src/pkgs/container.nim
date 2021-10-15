@@ -270,11 +270,11 @@ proc createContainer*(settings: RuntimeSettings,
     createDir(cDir)
 
   result = settings.initContainerConfig(
-                               imageId,
-                               containerId,
-                               repo,
-                               tag,
-                               cgroups)
+    imageId,
+    containerId,
+    repo,
+    tag,
+    cgroups)
 
   if command.len > 0 and command[0].len > 0:
     result.cmd = command
@@ -412,7 +412,11 @@ proc execContainer*(settings: RuntimeSettings,
 
       # seccomp
       if config.isSysCallFilter:
-        setSysCallFiler()
+        let path = if settings.seccompProfilePath.len > 0:
+                     settings.seccompProfilePath
+                    else:
+                      ""
+        setSysCallFiler(path)
 
       try:
         execvp(config.cmd)
@@ -458,11 +462,11 @@ proc runContainer*(settings: RuntimeSettings,
                    command: seq[string]) =
 
   var config = settings.createContainer(
-                               repo,
-                               tag,
-                               containersDir,
-                               cgroupSettings,
-                               command)
+    repo,
+    tag,
+    containersDir,
+    cgroupSettings,
+    command)
 
   if isRootUser():
     execContainer(settings, config, containersDir)
