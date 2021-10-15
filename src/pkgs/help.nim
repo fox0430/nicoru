@@ -59,6 +59,8 @@ Options:
   --cpulimit int        Limit CPU
   --cpucorelimit int    Limit CPU core
   --memorylimit         Limit memory
+  --seccomp             Enable Seccomp
+  --seccomp-profile     Seccomp profile path
 """
 
 const startHelpMessage = """
