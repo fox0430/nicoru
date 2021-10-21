@@ -6,6 +6,7 @@ type RuntimeSettings* = object
   background*: bool
   seccomp*: bool
   seccompProfilePath*: string
+  network: bool
 
 proc initRuntimeSetting*(): RuntimeSettings =
   result.baseDir = getHomeDir() / ".local/share/nicoru"
@@ -42,3 +43,6 @@ proc layerPath*(settings: RuntimeSettings, blob: string): string =
 
 proc containerConfigPath*(settings: RuntimeSettings, containerId: string): string =
   return settings.containersPath() / containerId / "config.json"
+
+proc netNsPath*(): string =
+  return "/var/run/nicoru/netns"

@@ -95,6 +95,8 @@ proc sethostname(name: cstring, len: csize_t): cint {.importc, header:"<linux/un
 
 proc setenv(name, value: cstring, overwrite: cint): cint {.importc, header: "<stdlib.h>"}
 
+proc setns(fd, nstype: cint): cint {.import, header: "sched.h".}
+
 ## Raw system call
 
 proc pivotRoot*(newRoot, putOld: string) =
@@ -194,3 +196,11 @@ proc execvp*(command: seq[string]) =
 
   let exitCode = execvp(cmd, args)
   if exitCode < 0: exception(fmt "Failed execv: {exitCode}")
+
+proc open*(a1: string, a2: int, mode: Mode): int =
+  result = posix.open(a1, a2, mode)
+  if result < 0: exception(fmt "Failed open: {exitCode}")
+
+proc setns*(fd, nstype: int) =
+  let exitCode = setns(cint(fd), cint(nstype))
+  if exitCode < 0: exception(fmt "Failed setns {exitCode}")
