@@ -1,4 +1,4 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils
+import os, oids, strformat, json, osproc, posix, inotify, strutils, linux
 import image, linuxutils, settings, cgroups, seccomputils
 
 type State = enum
