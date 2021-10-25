@@ -10,6 +10,6 @@ bin           = @["nicoru"]
 
 # Dependencies
 
-requires "nim >= 1.4.8"
+requires "nim >= 1.6.0"
 requires "https://github.com/def-/nim-syscall >= 0.1"
 requires "seccomp >= 0.2.1"
