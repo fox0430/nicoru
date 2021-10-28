@@ -95,7 +95,7 @@ proc sethostname(name: cstring, len: csize_t): cint {.importc, header:"<linux/un
 
 proc setenv(name, value: cstring, overwrite: cint): cint {.importc, header: "<stdlib.h>"}
 
-proc setns(fd, nstype: cint): cint {.import, header: "sched.h".}
+proc setns(fd, nstype: cint): cint {.importc, header: "<sched.h>".}
 
 ## Raw system call
 
