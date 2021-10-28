@@ -327,6 +327,10 @@ proc execContainer*(settings: RuntimeSettings,
 
   let imageId = config.imageId
 
+  block:
+    const interfaceName = "nicoru1"
+    createVirtualEthnet(interfaceName)
+
   # TODO: Fix name
   let
     containerId = config.containerId
