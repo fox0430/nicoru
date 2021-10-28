@@ -198,8 +198,8 @@ proc execvp*(command: seq[string]) =
   if exitCode < 0: exception(fmt "Failed execv: {exitCode}")
 
 proc open*(a1: string, a2: int, mode: Mode): int =
-  result = posix.open(a1, a2, mode)
-  if result < 0: exception(fmt "Failed open: {exitCode}")
+  result = posix.open(cstring(a1), cint(a2), mode)
+  if result < 0: exception(fmt "Failed open: {result}")
 
 proc setns*(fd, nstype: int) =
   let exitCode = setns(cint(fd), cint(nstype))
