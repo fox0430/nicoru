@@ -1,12 +1,17 @@
 import os
 
+type NetworkMode* {.pure.} = enum
+  none
+  bridge
+  host
+
 type RuntimeSettings* = object
   baseDir*: string
   debug*: bool
   background*: bool
   seccomp*: bool
   seccompProfilePath*: string
-  network: bool
+  networkMode*: NetworkMode
 
 proc initRuntimeSetting*(): RuntimeSettings =
   result.baseDir = getHomeDir() / ".local/share/nicoru"
