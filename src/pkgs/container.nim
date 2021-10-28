@@ -1,5 +1,5 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils
-import image, linuxutils, settings, cgroups, seccomputils
+import image, linuxutils, settings, cgroups, seccomputils, network
 
 type State = enum
   running
@@ -310,6 +310,17 @@ proc setEnv(envs: seq[string]) =
       value = envSplit[1]
     setenv(name, value, 1)
 
+proc createNamespaces(networkMode: NetworkMode) =
+  var flags = CLONE_NEWUTS or CLONE_NEWIPC or CLONE_NEWPID or CLONE_NEWNS
+
+  case networkMode:
+    of NetworkMode.none, NetworkMode.bridge:
+      flags = flags or CLONE_NEWNET
+    else:
+      discard
+
+  unshare(flags)
+
 proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
                     containersDir: string) =
@@ -326,12 +337,15 @@ proc execContainer*(settings: RuntimeSettings,
 
   if getpid() != parentPid:
 
-    const flags = CLONE_NEWUTS or CLONE_NEWIPC or CLONE_NEWPID or CLONE_NEWNS
-    unshare(flags)
+    # Create Linux namespaces using unshare syscall
+    createNamespaces(settings.networkMode)
+
     let secondForkPid = fork()
 
     if getpid() == 1:
       let manifestJson = parseFile(settings.imagesHashPath(imageId))
+
+      initContainerNetwork(config.containerId)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
