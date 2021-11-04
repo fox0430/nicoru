@@ -1,5 +1,5 @@
 import posix, strformat, os, strutils, osproc
-import linuxutils, settings
+import linuxutils
 
 proc upNetworkInterface*(interfaceName: string) =
   let cmd = fmt"ip link set {interfaceName} up"
