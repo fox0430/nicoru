@@ -1,6 +1,6 @@
 {.deadCodeElim:on.}
 
-import posix, linux, strformat
+import posix, linux, strformat, strutils
 import syscall
 
 const
@@ -69,6 +69,8 @@ const
 const
   # Can get size with "sizeof (struct inotify_event)" in C
   INOTIFY_EVENT_SZIE* = 32768
+
+proc toPid*(str: string): Pid = Pid(str.parseInt)
 
 # Exception
 type Error = object of Exception

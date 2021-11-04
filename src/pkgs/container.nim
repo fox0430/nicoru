@@ -327,9 +327,9 @@ proc execContainer*(settings: RuntimeSettings,
 
   let imageId = config.imageId
 
-  block:
-    const interfaceName = "nicoru1"
-    createVirtualEthnet(interfaceName)
+  const NETWORK_INTERFACE_NAME = "nicoru1"
+
+  createVirtualEthnet(NETWORK_INTERFACE_NAME)
 
   # TODO: Fix name
   let
@@ -425,6 +425,16 @@ proc execContainer*(settings: RuntimeSettings,
                       ""
         setSysCallFiler(path)
 
+      block:
+        # Wait for a network interface to be ready.
+        waitInterfaceReady(NETWORK_INTERFACE_NAME)
+
+        # TODO: Fix IP
+        const IP_ADDR = "10.0.0.2/24"
+        let interfaceName = NETWORK_INTERFACE_NAME & "-br"
+        addIpAddrToVeth(interfaceName, IP_ADDR)
+        upNetworkInterface(interfaceName)
+
       try:
         execvp(config.cmd)
       except:
@@ -436,7 +446,6 @@ proc execContainer*(settings: RuntimeSettings,
 
       writeFile(containerDir / "pid", $secondForkPid)
 
-      # TODO: Delete
       if not settings.background:
         var status: cint
         discard waitpid(secondForkPid, status, WUNTRACED)
@@ -452,6 +461,10 @@ proc execContainer*(settings: RuntimeSettings,
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
+    # TODO: Up NIC in container
+    addInterfaceToContainer(NETWORK_INTERFACE_NAME, pid.toPid)
+
+    # TODO: Delete
     var status: cint
     discard waitpid(firstForkPid, status, WUNTRACED)
 
