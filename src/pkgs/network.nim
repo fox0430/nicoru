@@ -7,15 +7,15 @@ proc upNetworkInterface*(interfaceName: string) =
     r = execShellCmd(cmd)
 
   if r != 0:
-    exception("Failed to '{cmd}': exitCode: {r}")
+    exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-proc createVirtualEthnet*(interfaceName: string) =
+proc createVirtualEthnet*(hostInterfaceName, containerInterfaceName: string) =
   let
-    cmd = fmt"ip link add name {interfaceName} type veth peer name {interfaceName}-br"
+    cmd = fmt"ip link add name {hostInterfaceName} type veth peer name {containerInterfaceName}"
     r = execShellCmd(cmd)
 
   if r != 0:
-    exception("Failed to '{cmd}': exitCode: {r}")
+    exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
 # TODO: Add type for IP address
 proc addIpAddrToVeth*(interfaceName, ipAddr: string) =
@@ -24,7 +24,7 @@ proc addIpAddrToVeth*(interfaceName, ipAddr: string) =
     r = execShellCmd(cmd)
 
   if r != 0:
-    exception("Failed to '{cmd}': exitCode: {r}")
+    exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
 # Wait for a network interface to be ready.
 proc waitInterfaceReady*(interfaceName: string) =
@@ -40,34 +40,32 @@ proc waitInterfaceReady*(interfaceName: string) =
   else:
     exception("Failed to ip command in container")
 
-proc addInterfaceToContainer*(interfaceName: string, pid: Pid) =
+proc addInterfaceToContainer*(containerInterfaceName: string, pid: Pid) =
   block:
     let
-      cmd = fmt"ip link set {interfaceName}-br netns {$pid}"
+      cmd = fmt"ip link set {containerInterfaceName} netns {$pid}"
       r = execShellCmd(cmd)
 
     if r != 0:
-      exception("Failed to '{cmd}': exitCode: {r}")
+      exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   block:
     # TODO: Fix IP
     const IP_ADDR = "10.0.0.1/24"
-    addIpAddrToVeth(interfaceName, IP_ADDR)
+    addIpAddrToVeth(containerInterfaceName, IP_ADDR)
 
-  upNetworkInterface(interfaceName)
+  upNetworkInterface(containerInterfaceName)
 
 # TODO: Add type for IP address
-proc initContainerNetwork*(containerId, interfaceName, ipAddr: string) =
+proc initContainerNetwork*(
+  containerId, hostInterfaceName, containerInterfaceName, ipAddr: string) =
+
   block:
     const DEVIC_ENAME = "lo"
     upNetworkInterface(DEVIC_ENAME)
 
   # Wait for a network interface to be ready.
-  waitInterfaceReady(interfaceName)
+  waitInterfaceReady(containerInterfaceName)
 
-  block:
-    # TODO: Fix val name
-    let interfaceName = fmt"{interfaceName}-br"
-
-    addIpAddrToVeth(interfaceName, ipAddr)
-    upNetworkInterface(interfaceName)
+  addIpAddrToVeth(hostInterfaceName, ipAddr)
+  upNetworkInterface(containerInterfaceName)

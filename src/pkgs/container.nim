@@ -327,9 +327,12 @@ proc execContainer*(settings: RuntimeSettings,
 
   let imageId = config.imageId
 
-  const NETWORK_INTERFACE_NAME = "nicoru1"
+  const
+    HOST_NETWORK_INTERFACE_NAME = "veth0"
+    CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
 
-  createVirtualEthnet(NETWORK_INTERFACE_NAME)
+  createVirtualEthnet(HOST_NETWORK_INTERFACE_NAME,
+                      CONTAINER_NETWORK_INTERFACE_NAME)
 
   # TODO: Fix name
   let
@@ -354,7 +357,10 @@ proc execContainer*(settings: RuntimeSettings,
         # TODO: Fix IP
         const IP_ADDR = "10.0.0.2/24"
         let containerId = config.containerId
-        initContainerNetwork(containerId, NETWORK_INTERFACE_NAME, IP_ADDR)
+        initContainerNetwork(containerId,
+                             HOST_NETWORK_INTERFACE_NAME,
+                             CONTAINER_NETWORK_INTERFACE_NAME,
+                             IP_ADDR)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -457,7 +463,7 @@ proc execContainer*(settings: RuntimeSettings,
     let pid = readFile(containerDir / "pid")
 
     # Add network interface
-    addInterfaceToContainer(NETWORK_INTERFACE_NAME, pid.toPid)
+    addInterfaceToContainer(CONTAINER_NETWORK_INTERFACE_NAME, pid.toPid)
 
     # TODO: Delete
     var status: cint
