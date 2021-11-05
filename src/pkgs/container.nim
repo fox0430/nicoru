@@ -456,7 +456,6 @@ proc execContainer*(settings: RuntimeSettings,
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
-    # TODO: Up NIC in container
     addInterfaceToContainer(NETWORK_INTERFACE_NAME, pid.toPid)
 
     # TODO: Delete
