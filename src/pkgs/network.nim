@@ -2,17 +2,29 @@ import posix, strformat, os, strutils, osproc
 import linuxutils
 
 proc upNetworkInterface*(interfaceName: string) =
-  let cmd = fmt"ip link set {interfaceName} up"
-  discard execShellCmd(cmd)
+  let
+    cmd = fmt"ip link set {interfaceName} up"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception("Failed to '{cmd}': exitCode: {r}")
 
 proc createVirtualEthnet*(interfaceName: string) =
-  let cmd = fmt"ip link add name {interfaceName} type veth peer name {interfaceName}-br"
-  discard execShellCmd(cmd)
+  let
+    cmd = fmt"ip link add name {interfaceName} type veth peer name {interfaceName}-br"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception("Failed to '{cmd}': exitCode: {r}")
 
 # TODO: Add type for IP address
 proc addIpAddrToVeth*(interfaceName, ipAddr: string) =
-  let cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
-  discard execShellCmd(cmd)
+  let
+    cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception("Failed to '{cmd}': exitCode: {r}")
 
 # Wait for a network interface to be ready.
 proc waitInterfaceReady*(interfaceName: string) =
@@ -30,8 +42,12 @@ proc waitInterfaceReady*(interfaceName: string) =
 
 proc addInterfaceToContainer*(interfaceName: string, pid: Pid) =
   block:
-    let cmd = fmt"ip link set {interfaceName}-br netns {$pid}"
-    discard execShellCmd(cmd)
+    let
+      cmd = fmt"ip link set {interfaceName}-br netns {$pid}"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception("Failed to '{cmd}': exitCode: {r}")
 
   block:
     # TODO: Fix IP
