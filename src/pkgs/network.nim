@@ -40,7 +40,18 @@ proc addInterfaceToContainer*(interfaceName: string, pid: Pid) =
 
   upNetworkInterface(interfaceName)
 
-proc initContainerNetwork*(containerId: string) =
+# TODO: Add type for IP address
+proc initContainerNetwork*(containerId, interfaceName, ipAddr: string) =
   block:
-    const deviceName = "lo"
-    upNetworkInterface(deviceName)
+    const DEVIC_ENAME = "lo"
+    upNetworkInterface(DEVIC_ENAME)
+
+  # Wait for a network interface to be ready.
+  waitInterfaceReady(interfaceName)
+
+  block:
+    # TODO: Fix val name
+    let interfaceName = fmt"{interfaceName}-br"
+
+    addIpAddrToVeth(interfaceName, ipAddr)
+    upNetworkInterface(interfaceName)
