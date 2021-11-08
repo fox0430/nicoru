@@ -34,8 +34,7 @@ proc createVirtualEthnet*(hostInterfaceName, containerInterfaceName: string) =
 # TODO: Add type for IP address
 proc addIpAddrToVeth*(interfaceName, ipAddr: string) =
   let
-    actualInterfaceName = getActualInterfaceName(interfaceName)
-    cmd = fmt"ip addr add {ipAddr} dev {actualInterfaceName}"
+    cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
     r = execShellCmd(cmd)
 
   if r != 0:
@@ -51,7 +50,9 @@ proc waitInterfaceReady*(interfaceName: string) =
   else:
     exception("Failed to ip command in container")
 
-proc addInterfaceToContainer*(containerInterfaceName: string, pid: Pid) =
+proc addInterfaceToContainer*(hostInterfaceName, containerInterfaceName: string,
+                              pid: Pid) =
+
   block:
     let
       cmd = fmt"ip link set {containerInterfaceName} netns {$pid}"
@@ -61,27 +62,22 @@ proc addInterfaceToContainer*(containerInterfaceName: string, pid: Pid) =
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   block:
-    # TODO: Need to get actial interface name from new netns
-    let actualInterfaceName = getActualInterfaceName(containerInterfaceName)
-
     # TODO: Fix IP
     const IP_ADDR = "10.0.0.1/24"
-    addIpAddrToVeth(actualInterfaceName, IP_ADDR)
+    upNetworkInterface(hostInterfaceName)
 
-    upNetworkInterface(actualInterfaceName)
+    addIpAddrToVeth(hostInterfaceName, IP_ADDR)
 
 # TODO: Add type for IP address
 proc initContainerNetwork*(
   containerId, hostInterfaceName, containerInterfaceName, ipAddr: string) =
-
-  let actualInterfaceName = getActualInterfaceName(containerInterfaceName)
 
   block:
     const DEVIC_ENAME = "lo"
     upNetworkInterface(DEVIC_ENAME)
 
   # Wait for a network interface to be ready.
-  waitInterfaceReady(actualInterfaceName)
+  waitInterfaceReady(containerInterfaceName)
 
-  addIpAddrToVeth(hostInterfaceName, ipAddr)
-  upNetworkInterface(actualInterfaceName)
+  addIpAddrToVeth(containerInterfaceName, ipAddr)
+  upNetworkInterface(containerInterfaceName)

@@ -463,7 +463,9 @@ proc execContainer*(settings: RuntimeSettings,
     let pid = readFile(containerDir / "pid")
 
     # Add network interface
-    addInterfaceToContainer(CONTAINER_NETWORK_INTERFACE_NAME, pid.toPid)
+    addInterfaceToContainer(HOST_NETWORK_INTERFACE_NAME,
+                            CONTAINER_NETWORK_INTERFACE_NAME,
+                            pid.toPid)
 
     # TODO: Delete
     var status: cint
