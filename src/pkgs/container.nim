@@ -328,8 +328,9 @@ proc execContainer*(settings: RuntimeSettings,
   let imageId = config.imageId
 
   const
-    HOST_NETWORK_INTERFACE_NAME = "veth0"
+    HOST_NETWORK_INTERFACE_NAME = "nicoru-veth0"
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
+    BRIDGE_NAME = "nicoru-br0"
 
   createVirtualEthnet(HOST_NETWORK_INTERFACE_NAME,
                       CONTAINER_NETWORK_INTERFACE_NAME)
@@ -360,6 +361,7 @@ proc execContainer*(settings: RuntimeSettings,
         initContainerNetwork(containerId,
                              HOST_NETWORK_INTERFACE_NAME,
                              CONTAINER_NETWORK_INTERFACE_NAME,
+                             BRIDGE_NAME,
                              IP_ADDR)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
@@ -466,6 +468,9 @@ proc execContainer*(settings: RuntimeSettings,
     addInterfaceToContainer(HOST_NETWORK_INTERFACE_NAME,
                             CONTAINER_NETWORK_INTERFACE_NAME,
                             pid.toPid)
+
+    createBridge(BRIDGE_NAME)
+    connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, BRIDGE_NAME)
 
     # TODO: Delete
     var status: cint

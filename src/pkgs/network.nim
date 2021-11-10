@@ -15,6 +15,13 @@ proc getActualInterfaceName(interfaceName: string): string =
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
 
+proc checkIfExistNetworkInterface(interfaceName: string): bool =
+  const CMD = "ip a"
+  let r = execCmdEx(CMD)
+
+  if r.exitCode == 0:
+    result = r.output.contains(interfaceName)
+
 proc upNetworkInterface*(interfaceName: string) =
   let
     cmd = fmt"ip link set {interfaceName} up"
@@ -68,9 +75,35 @@ proc addInterfaceToContainer*(hostInterfaceName, containerInterfaceName: string,
 
     addIpAddrToVeth(hostInterfaceName, IP_ADDR)
 
+proc createBridge*(bridgeName: string) =
+  block:
+    if not checkIfExistNetworkInterface(bridgeName):
+      let
+        cmd = fmt"ip link add {bridgeName} type bridge"
+        r = execShellCmd(cmd)
+
+      if r != 0:
+        exception(fmt"Failed to '{cmd}': exitCode: {r}")
+
+  block:
+    let
+      cmd = fmt"ip link set {bridgeName} up"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+proc connectVethToBrige*(interfaceName, bridgeName: string) =
+  let
+    cmd = fmt"ip link set {interfaceName} master {bridgeName}"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception(fmt"Failed to '{cmd}': exitCode {r}")
+
 # TODO: Add type for IP address
 proc initContainerNetwork*(
-  containerId, hostInterfaceName, containerInterfaceName, ipAddr: string) =
+  containerId, hostInterfaceName, containerInterfaceName, bridgeName, ipAddr: string) =
 
   block:
     const DEVIC_ENAME = "lo"
