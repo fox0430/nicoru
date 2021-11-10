@@ -464,13 +464,17 @@ proc execContainer*(settings: RuntimeSettings,
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
-    # Add network interface
-    addInterfaceToContainer(HOST_NETWORK_INTERFACE_NAME,
-                            CONTAINER_NETWORK_INTERFACE_NAME,
-                            pid.toPid)
+    block:
+      # Add network interface
+      addInterfaceToContainer(HOST_NETWORK_INTERFACE_NAME,
+                              CONTAINER_NETWORK_INTERFACE_NAME,
+                              pid.toPid)
 
-    createBridge(BRIDGE_NAME)
-    connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, BRIDGE_NAME)
+      createBridge(BRIDGE_NAME)
+      connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, BRIDGE_NAME)
+
+      const IP_ADDR = "10.0.0.0/16"
+      setDefaulRoute(BRIDGE_NAME, IP_ADDR)
 
     # TODO: Delete
     var status: cint

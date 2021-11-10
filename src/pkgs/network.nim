@@ -101,6 +101,14 @@ proc connectVethToBrige*(interfaceName, bridgeName: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
+proc setDefaulRoute*(bridgeName, ipAddr: string) =
+  let
+    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} ! -o {bridgeName} -j MASQUERADE"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception(fmt"Failed to '{cmd}': exitCode {r}")
+
 # TODO: Add type for IP address
 proc initContainerNetwork*(
   containerId, hostInterfaceName, containerInterfaceName, bridgeName, ipAddr: string) =
