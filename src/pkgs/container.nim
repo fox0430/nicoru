@@ -330,7 +330,7 @@ proc execContainer*(settings: RuntimeSettings,
   const
     HOST_NETWORK_INTERFACE_NAME = "nicoru-veth0"
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
-    BRIDGE_NAME = "nicoru-br0"
+    DEFAULT_BRIDGE_NAME = "nicoru-br0"
 
   createVirtualEthnet(HOST_NETWORK_INTERFACE_NAME,
                       CONTAINER_NETWORK_INTERFACE_NAME)
@@ -361,7 +361,7 @@ proc execContainer*(settings: RuntimeSettings,
         initContainerNetwork(containerId,
                              HOST_NETWORK_INTERFACE_NAME,
                              CONTAINER_NETWORK_INTERFACE_NAME,
-                             BRIDGE_NAME,
+                             DEFAULT_BRIDGE_NAME,
                              IP_ADDR)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
@@ -470,11 +470,12 @@ proc execContainer*(settings: RuntimeSettings,
                               CONTAINER_NETWORK_INTERFACE_NAME,
                               pid.toPid)
 
-      createBridge(BRIDGE_NAME)
-      connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, BRIDGE_NAME)
+      # Create a default bridge
+      createBridge(DEFAULT_BRIDGE_NAME)
+      connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, DEFAULT_BRIDGE_NAME)
 
       const IP_ADDR = "10.0.0.0/16"
-      setDefaulRoute(BRIDGE_NAME, IP_ADDR)
+      setDefaulRoute(DEFAULT_BRIDGE_NAME, IP_ADDR)
 
     # TODO: Delete
     var status: cint
