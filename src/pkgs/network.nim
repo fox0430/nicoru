@@ -1,6 +1,25 @@
 import posix, strformat, os, strutils, osproc
 import linuxutils
 
+proc getAllInterfaceName(): seq[string] =
+  let
+    cmd = "ip a"
+    r = execCmdEx(cmd)
+
+  if r.exitCode != 0:
+    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
+
+  let outputLines = r.output.splitLines
+  for outputL in outputLines:
+    if outputL.len > 0 and outputL[0].isDigit:
+      let
+        l = outputL.split(" ")
+        interfaceName = l[1]
+
+      if interfaceName.len > 2:
+        # Remove ':' from interfaceName
+        result.add interfaceName[0 .. interfaceName.high - 1]
+
 proc getActualInterfaceName(interfaceName: string): string =
   if interfaceName.len < 1:
     exception("Invalid interface name")
@@ -108,6 +127,17 @@ proc setDefaulRoute*(bridgeName, ipAddr: string) =
 
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+# Generate a new network interface name for host
+proc newHostNetworkInterfaceName*(baseHostInterfaceName: string): string =
+  let allInterfaceName = getAllInterfaceName()
+
+  var countHostInterface = 0
+  for name in allInterfaceName:
+    if name.contains(baseHostInterfaceName):
+      countHostInterface.inc
+
+  result = baseHostInterfaceName & $countHostInterface
 
 # TODO: Add type for IP address
 proc initContainerNetwork*(

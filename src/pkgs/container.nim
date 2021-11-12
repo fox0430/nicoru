@@ -328,11 +328,13 @@ proc execContainer*(settings: RuntimeSettings,
   let imageId = config.imageId
 
   const
-    HOST_NETWORK_INTERFACE_NAME = "nicoru-veth0"
+    BASE_HOST_NETWORK_INTERFACE_NAME = "nicoru-veth"
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
     DEFAULT_BRIDGE_NAME = "nicoru-br0"
 
-  createVirtualEthnet(HOST_NETWORK_INTERFACE_NAME,
+  let hostNetworkInterfaceName = newHostNetworkInterfaceName(BASE_HOST_NETWORK_INTERFACE_NAME)
+
+  createVirtualEthnet(hostNetworkInterfaceName,
                       CONTAINER_NETWORK_INTERFACE_NAME)
 
   # TODO: Fix name
@@ -357,9 +359,8 @@ proc execContainer*(settings: RuntimeSettings,
       block:
         # TODO: Fix IP
         const IP_ADDR = "10.0.0.2/24"
-        let containerId = config.containerId
         initContainerNetwork(containerId,
-                             HOST_NETWORK_INTERFACE_NAME,
+                             hostNetworkInterfaceName,
                              CONTAINER_NETWORK_INTERFACE_NAME,
                              DEFAULT_BRIDGE_NAME,
                              IP_ADDR)
@@ -466,13 +467,13 @@ proc execContainer*(settings: RuntimeSettings,
 
     block:
       # Add network interface
-      addInterfaceToContainer(HOST_NETWORK_INTERFACE_NAME,
+      addInterfaceToContainer(hostNetworkInterfaceName,
                               CONTAINER_NETWORK_INTERFACE_NAME,
                               pid.toPid)
 
       # Create a default bridge
       createBridge(DEFAULT_BRIDGE_NAME)
-      connectVethToBrige(HOST_NETWORK_INTERFACE_NAME, DEFAULT_BRIDGE_NAME)
+      connectVethToBrige(hostNetworkInterfaceName, DEFAULT_BRIDGE_NAME)
 
       const IP_ADDR = "10.0.0.0/16"
       setDefaulRoute(DEFAULT_BRIDGE_NAME, IP_ADDR)
