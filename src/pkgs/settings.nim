@@ -52,3 +52,9 @@ proc containerConfigPath*(settings: RuntimeSettings, containerId: string): strin
 
 proc netNsPath*(): string =
   return "/var/run/nicoru/netns"
+
+proc runPath*(): string =
+  return "/var/run/nicoru"
+
+proc networkStatePath*(): string =
+  return "/var/run/nicoru/network_state.json"

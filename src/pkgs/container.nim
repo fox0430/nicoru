@@ -488,6 +488,8 @@ proc execContainer*(settings: RuntimeSettings,
     else:
       config.exitContainer(State.dead, configPath)
 
+    removeIpFromIpList()
+
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 
 proc runContainer*(settings: RuntimeSettings,

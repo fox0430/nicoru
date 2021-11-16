@@ -1,5 +1,5 @@
-import posix, strformat, os, strutils, osproc
-import linuxutils
+import posix, strformat, os, strutils, osproc, json
+import linuxutils, settings
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -33,6 +33,72 @@ proc getActualInterfaceName(interfaceName: string): string =
         let splited = l.split(":")
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
+
+# TODO: Add type for IP address
+proc newVethIpAddr(): string =
+  const filePath = networkStatePath()
+
+  result = "10.0.0.1/24"
+
+  if fileExists(filePath):
+    let json = parseFile(filePath)
+
+    if json.contains("ips"):
+      let ipList = json["ips"]
+
+      var maxNum = 1
+      for ip in ipList:
+        let
+          splitedIp = ip.getStr.split("/")
+          num = (splitedIp[0].join.split("."))[^1]
+
+        if num.parseInt > maxNum:
+          maxNum = num.parseInt
+
+      let newNum = maxNum + 1
+      result = fmt"10.0.0.{newNum}/24"
+
+# TODO: Add type for IP address
+proc addIpToIpList(containerId, ipAddr: string) =
+  const filePath = networkStatePath()
+
+  if fileExists(filePath):
+    # TODO: Error handling
+    let json = parseFile(filePath)
+
+    if json.contains("ips"):
+      var ipList = json["ips"]
+      ipList.add(%* {containerId: ipAddr})
+
+      let newJson = %* {"ips": ipList}
+      writeFile(filePath, $newJson)
+  else:
+    let json = %* {"ips": [{containerId: ipAddr}]}
+    # TODO: Error handling
+    createDir(runPath())
+    writeFile(filePath, $json)
+
+# TODO: Add type for IP address
+proc removeIpFromIpList*(containerId, ipAddr: string) =
+  const filePath = networkStatePath()
+
+  if fileExists(filePath):
+    # TODO: Error handling
+    let json = parseFile(filePath)
+
+    if json.contains("ips") and json["ips"].contains(ipAddr):
+      var newIpList: seq[(string, string)] = @[]
+      for ip in json["ips"]:
+        if $ip != ipAddr: newIpList.add (containerId, $ip)
+
+      var newJson = json
+      newJson["ips"] = %* {"ips": newIpList}
+      # TODO: Error handling
+      writeFile(filePath, $json)
+    else:
+      echo "Error: IP list not found"
+  else:
+    echo "Error: IP list not found"
 
 proc checkIfExistNetworkInterface(interfaceName: string): bool =
   const CMD = "ip a"
@@ -76,8 +142,9 @@ proc waitInterfaceReady*(interfaceName: string) =
   else:
     exception("Failed to ip command in container")
 
-proc addInterfaceToContainer*(hostInterfaceName, containerInterfaceName: string,
-                              pid: Pid) =
+proc addInterfaceToContainer*(
+  containerId, hostInterfaceName, containerInterfaceName: string,
+  pid: Pid): string =
 
   block:
     let
@@ -88,11 +155,10 @@ proc addInterfaceToContainer*(hostInterfaceName, containerInterfaceName: string,
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   block:
-    # TODO: Fix IP
-    const IP_ADDR = "10.0.0.1/24"
     upNetworkInterface(hostInterfaceName)
-
-    addIpAddrToVeth(hostInterfaceName, IP_ADDR)
+    let ipAddr = newVethIpAddr()
+    addIpAddrToVeth(hostInterfaceName, ipAddr)
+    addIpToIpList(containerId, ipAddr)
 
 proc createBridge*(bridgeName: string) =
   block:
