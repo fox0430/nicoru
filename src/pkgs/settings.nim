@@ -58,3 +58,6 @@ proc runPath*(): string =
 
 proc networkStatePath*(): string =
   return "/var/run/nicoru/network_state.json"
+
+proc defaultBridgeName*(): string =
+  return "nicoru0"

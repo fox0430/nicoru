@@ -467,7 +467,8 @@ proc execContainer*(settings: RuntimeSettings,
 
     block:
       # Add network interface
-      addInterfaceToContainer(hostNetworkInterfaceName,
+      addInterfaceToContainer(containerId,
+                              hostNetworkInterfaceName,
                               CONTAINER_NETWORK_INTERFACE_NAME,
                               pid.toPid)
 
@@ -488,7 +489,7 @@ proc execContainer*(settings: RuntimeSettings,
     else:
       config.exitContainer(State.dead, configPath)
 
-    removeIpFromIpList()
+    #network.removeIpFromIpList(containerId)
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 

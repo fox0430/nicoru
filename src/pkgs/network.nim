@@ -1,5 +1,17 @@
-import posix, strformat, os, strutils, osproc, json
+import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
 import linuxutils, settings
+
+type
+  IpList = object
+    containerId: string
+    ip: Option[string]
+
+  Bridge = object
+    name: string
+    ipList: seq[IpList]
+
+  Network* = object
+    bridges: seq[Bridge]
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -33,6 +45,40 @@ proc getActualInterfaceName(interfaceName: string): string =
         let splited = l.split(":")
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
+
+proc toNetwork(json: JsonNode): Network =
+  for b in json["bridges"]:
+    var bridge = Bridge(name: b["name"].getStr)
+
+    for ip in b["ipList"]:
+      let containerId = ip["containerId"].getStr
+      var ipAddr = if ip["ip"]["has"].getBool: some(ip["ip"]["val"].getStr)
+                   else: none(string)
+
+      bridge.ipList.add IpList(containerId: containerId, ip: ipAddr)
+
+    result.bridges.add bridge
+
+proc initNetwork*(containerId: string): Network =
+  let
+    ipList = IpList(containerId: containerId, ip: none(string))
+    bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
+  result = Network(bridges: @[bridge])
+
+# Write/Overwrite a network_state.json
+proc updateNetworkState(network: Network, networkStatePath: string) =
+  let (dir, _, _) = networkStatePath.splitFile
+  if not dirExists(dir):
+    createDir(runPath())
+
+  # TODO: Error handling
+  let json = $$network
+  writeFile(networkStatePath, $json)
+
+# Read a network_state.json
+proc readNetworkState(networkStatePath: string): Option[Network] =
+  if fileExists(networkStatePath):
+    let json = parseFile(networkStatePath)
 
 # TODO: Add type for IP address
 proc newVethIpAddr(): string =
@@ -79,26 +125,13 @@ proc addIpToIpList(containerId, ipAddr: string) =
     writeFile(filePath, $json)
 
 # TODO: Add type for IP address
-proc removeIpFromIpList*(containerId, ipAddr: string) =
-  const filePath = networkStatePath()
-
-  if fileExists(filePath):
-    # TODO: Error handling
-    let json = parseFile(filePath)
-
-    if json.contains("ips") and json["ips"].contains(ipAddr):
-      var newIpList: seq[(string, string)] = @[]
-      for ip in json["ips"]:
-        if $ip != ipAddr: newIpList.add (containerId, $ip)
-
-      var newJson = json
-      newJson["ips"] = %* {"ips": newIpList}
-      # TODO: Error handling
-      writeFile(filePath, $json)
-    else:
-      echo "Error: IP list not found"
-  else:
-    echo "Error: IP list not found"
+proc removeIpFromIpList*(network: var Network, bridgeName, containerId: string) =
+  for bridgeIndex, b in network.bridges:
+    if b.name == bridgeName:
+      for ipListIndex, ip in b.ipList:
+        if ip.containerId == containerId:
+          network.bridges[bridgeIndex].ipList.delete(ipListIndex)
+          return
 
 proc checkIfExistNetworkInterface(interfaceName: string): bool =
   const CMD = "ip a"
@@ -144,7 +177,7 @@ proc waitInterfaceReady*(interfaceName: string) =
 
 proc addInterfaceToContainer*(
   containerId, hostInterfaceName, containerInterfaceName: string,
-  pid: Pid): string =
+  pid: Pid) =
 
   block:
     let
