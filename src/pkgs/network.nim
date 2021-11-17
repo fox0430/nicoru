@@ -4,7 +4,8 @@ import linuxutils, settings
 type
   IpList = object
     containerId: string
-    ip: Option[string]
+    cethIp: Option[string]
+    vethIp: Option[string]
 
   Bridge = object
     name: string
@@ -51,17 +52,23 @@ proc toNetwork(json: JsonNode): Network =
     var bridge = Bridge(name: b["name"].getStr)
 
     for ip in b["ipList"]:
-      let containerId = ip["containerId"].getStr
-      var ipAddr = if ip["ip"]["has"].getBool: some(ip["ip"]["val"].getStr)
-                   else: none(string)
+      let
+        containerId = ip["containerId"].getStr
+        cethIp = if ip["cethIp"]["has"].getBool: some(ip["cethIp"]["val"].getStr)
+                 else: none(string)
+        vethIp = if ip["vethIp"]["has"].getBool: some(ip["vethIp"]["val"].getStr)
+                 else: none(string)
 
-      bridge.ipList.add IpList(containerId: containerId, ip: ipAddr)
+      bridge.ipList.add IpList(containerId: containerId, cethIp: cethIp, vethIp: vethIp)
 
     result.bridges.add bridge
 
 proc initNetwork*(containerId: string): Network =
   let
-    ipList = IpList(containerId: containerId, ip: none(string))
+    ipList = IpList(containerId: containerId,
+                    cethIp: none(string),
+                    vethIp: none(string))
+
     bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
   result = Network(bridges: @[bridge])
 
