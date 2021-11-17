@@ -325,21 +325,32 @@ proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
                     containersDir: string) =
 
-  let imageId = config.imageId
+  let
+    containerId = config.containerId
+    imageId = config.imageId
 
   const
     BASE_HOST_NETWORK_INTERFACE_NAME = "nicoru-veth"
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
     DEFAULT_BRIDGE_NAME = "nicoru-br0"
 
-  let hostNetworkInterfaceName = newHostNetworkInterfaceName(BASE_HOST_NETWORK_INTERFACE_NAME)
+  # TODO: Remove
+  var network = initNetwork(containerId)
+  let
+    bridgeIndex = network.bridges.getCurrentBrigeIndex("")
+    ipList = network.bridges[bridgeIndex].newIpList(containerId)
+
+  network.bridges[bridgeIndex].add ipList
+
+  let hostNetworkInterfaceName = newHostNetworkInterfaceName(
+    BASE_HOST_NETWORK_INTERFACE_NAME,
+    bridgeIndex)
 
   createVirtualEthnet(hostNetworkInterfaceName,
                       CONTAINER_NETWORK_INTERFACE_NAME)
 
   # TODO: Fix name
   let
-    containerId = config.containerId
     containerDir = containersDir / containerId
 
     parentPid = getpid()
@@ -357,13 +368,11 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Set up container network
       block:
-        # TODO: Fix IP
-        const IP_ADDR = "10.0.0.2/24"
-        initContainerNetwork(containerId,
+        initContainerNetwork(ipList,
+                             containerId,
                              hostNetworkInterfaceName,
                              CONTAINER_NETWORK_INTERFACE_NAME,
-                             DEFAULT_BRIDGE_NAME,
-                             IP_ADDR)
+                             DEFAULT_BRIDGE_NAME)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 

@@ -2,17 +2,19 @@ import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
 import linuxutils, settings
 
 type
-  IpList = object
+  # TODO: Add network interface names
+  # TODO: Fix type name
+  IpList* = object
     containerId: string
     cethIp: Option[string]
     vethIp: Option[string]
 
-  Bridge = object
+  Bridge* = object
     name: string
     ipList: seq[IpList]
 
   Network* = object
-    bridges: seq[Bridge]
+    bridges*: seq[Bridge]
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -87,29 +89,34 @@ proc readNetworkState(networkStatePath: string): Option[Network] =
   if fileExists(networkStatePath):
     let json = parseFile(networkStatePath)
 
+proc getCurrentBrigeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int] =
+  for index, b in bridges:
+    if b.name == bridgeName:
+      return some(index)
+
 # TODO: Add type for IP address
-proc newVethIpAddr(): string =
-  const filePath = networkStatePath()
+# Get a new ipList (cethIp and vethIp)
+proc newIpList*(bridge: Bridge, containerId: string): IpList =
+  var maxNum = 0
+  for ip in bridge.iplist:
+    let
+      ipAddr = ip.vethIp.get
+      splitedIpAddr = ipAddr.split("/")
+      numStr = (splitedIpAddr[0].join.split("."))[^1]
+      num = numStr.parseInt
+    if num > maxNum:
+      maxNum = num
 
-  result = "10.0.0.1/24"
+  let
+    newCethIpAddr = fmt"10.0.0.{maxNum + 1}/24"
+    newVethIpAddr = fmt"10.0.0.{maxNum + 2}/24"
 
-  if fileExists(filePath):
-    let json = parseFile(filePath)
+  return IpList(containerId: containerId,
+                cethIp: some(newCethIpAddr),
+                vethIp: some(newVethIpAddr))
 
-    if json.contains("ips"):
-      let ipList = json["ips"]
-
-      var maxNum = 1
-      for ip in ipList:
-        let
-          splitedIp = ip.getStr.split("/")
-          num = (splitedIp[0].join.split("."))[^1]
-
-        if num.parseInt > maxNum:
-          maxNum = num.parseInt
-
-      let newNum = maxNum + 1
-      result = fmt"10.0.0.{newNum}/24"
+proc add*(bridge: var Bridge, ipList: IpList) =
+  bridge.ipList.add(ipList)
 
 # TODO: Add type for IP address
 proc addIpToIpList(containerId, ipAddr: string) =
@@ -160,6 +167,7 @@ proc createVirtualEthnet*(hostInterfaceName, containerInterfaceName: string) =
     cmd = fmt"ip link add name {hostInterfaceName} type veth peer name {containerInterfaceName}"
     r = execShellCmd(cmd)
 
+  # r == 2 is already exist
   if r != 0 and r != 2:
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
@@ -183,6 +191,7 @@ proc waitInterfaceReady*(interfaceName: string) =
     exception("Failed to ip command in container")
 
 proc addInterfaceToContainer*(
+  ipList: IpList,
   containerId, hostInterfaceName, containerInterfaceName: string,
   pid: Pid) =
 
@@ -194,11 +203,8 @@ proc addInterfaceToContainer*(
     if r != 0:
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-  block:
-    upNetworkInterface(hostInterfaceName)
-    let ipAddr = newVethIpAddr()
-    addIpAddrToVeth(hostInterfaceName, ipAddr)
-    addIpToIpList(containerId, ipAddr)
+  upNetworkInterface(hostInterfaceName)
+  addIpAddrToVeth(hostInterfaceName, ipList.cethIp.get)
 
 proc createBridge*(bridgeName: string) =
   block:
@@ -235,19 +241,15 @@ proc setDefaulRoute*(bridgeName, ipAddr: string) =
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 # Generate a new network interface name for host
-proc newHostNetworkInterfaceName*(baseHostInterfaceName: string): string =
-  let allInterfaceName = getAllInterfaceName()
+proc newHostNetworkInterfaceName*(baseHostInterfaceName: string,
+                                  bridgeIndex: int): string {.inline.} =
 
-  var countHostInterface = 0
-  for name in allInterfaceName:
-    if name.contains(baseHostInterfaceName):
-      countHostInterface.inc
-
-  result = baseHostInterfaceName & $countHostInterface
+  return baseHostInterfaceName & $bridgeIndex
 
 # TODO: Add type for IP address
 proc initContainerNetwork*(
-  containerId, hostInterfaceName, containerInterfaceName, bridgeName, ipAddr: string) =
+  ipList: IpList,
+  containerId, hostInterfaceName, containerInterfaceName, bridgeName: string) =
 
   block:
     const DEVIC_ENAME = "lo"
@@ -256,5 +258,5 @@ proc initContainerNetwork*(
   # Wait for a network interface to be ready.
   waitInterfaceReady(containerInterfaceName)
 
-  addIpAddrToVeth(containerInterfaceName, ipAddr)
+  addIpAddrToVeth(containerInterfaceName, ipList.vethIp.get)
   upNetworkInterface(containerInterfaceName)
