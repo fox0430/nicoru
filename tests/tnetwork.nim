@@ -51,3 +51,16 @@ suite "Network object":
 
     check network.bridges[0].ipList[0].ip.isSome
     check network.bridges[0].ipList[0].ip.get == "10.0.0.1/24"
+
+  test "Remove IP address from Network":
+    # TODO: Fix
+    let containerId = $genOid()
+
+    var network = initNetwork(containerId)
+
+    const IP_ADDR = "10.0.0.1/24"
+    network.bridges[0].ipList[0].ip = some(IP_ADDR)
+
+    network.removeIpFromIpList(defaultBridgeName(), containerId)
+
+    check network.bridges[0].ipList.len == 0
