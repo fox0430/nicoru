@@ -1,4 +1,4 @@
-import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
+import posix, strformat, os, strutils, osproc, json, marshal, options
 import linuxutils, settings
 
 type
