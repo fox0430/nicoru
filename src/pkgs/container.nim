@@ -1,4 +1,4 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils
+import os, oids, strformat, json, osproc, posix, inotify, strutils, options
 import image, linuxutils, settings, cgroups, seccomputils, network
 
 type State = enum
@@ -329,22 +329,24 @@ proc execContainer*(settings: RuntimeSettings,
     containerId = config.containerId
     imageId = config.imageId
 
+    # TODO: Remove
+    bridgeName = defaultBridgeName()
+
   const
     BASE_HOST_NETWORK_INTERFACE_NAME = "nicoru-veth"
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
-    DEFAULT_BRIDGE_NAME = "nicoru-br0"
 
   # TODO: Remove
   var network = initNetwork(containerId)
   let
-    bridgeIndex = network.bridges.getCurrentBrigeIndex("")
-    ipList = network.bridges[bridgeIndex].newIpList(containerId)
+    bridgeIndex = network.bridges.getCurrentBrigeIndex(bridgeName)
+    ipList = network.bridges[bridgeIndex.get].newIpList(containerId)
 
-  network.bridges[bridgeIndex].add ipList
+  network.bridges[bridgeIndex.get].add ipList
 
   let hostNetworkInterfaceName = newHostNetworkInterfaceName(
     BASE_HOST_NETWORK_INTERFACE_NAME,
-    bridgeIndex)
+    bridgeIndex.get)
 
   createVirtualEthnet(hostNetworkInterfaceName,
                       CONTAINER_NETWORK_INTERFACE_NAME)
@@ -372,7 +374,7 @@ proc execContainer*(settings: RuntimeSettings,
                              containerId,
                              hostNetworkInterfaceName,
                              CONTAINER_NETWORK_INTERFACE_NAME,
-                             DEFAULT_BRIDGE_NAME)
+                             bridgeName)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -476,17 +478,19 @@ proc execContainer*(settings: RuntimeSettings,
 
     block:
       # Add network interface
-      addInterfaceToContainer(containerId,
+      addInterfaceToContainer(ipList,
+                              containerId,
                               hostNetworkInterfaceName,
                               CONTAINER_NETWORK_INTERFACE_NAME,
                               pid.toPid)
 
       # Create a default bridge
-      createBridge(DEFAULT_BRIDGE_NAME)
-      connectVethToBrige(hostNetworkInterfaceName, DEFAULT_BRIDGE_NAME)
+      createBridge(bridgeName)
+      connectVethToBrige(hostNetworkInterfaceName, bridgeName)
 
+      # TODO: Remove
       const IP_ADDR = "10.0.0.0/16"
-      setDefaulRoute(DEFAULT_BRIDGE_NAME, IP_ADDR)
+      setDefaulRoute(bridgeName, IP_ADDR)
 
     # TODO: Delete
     var status: cint
