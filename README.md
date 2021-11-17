@@ -20,7 +20,10 @@ NOTE: Work in progress.
 
 nicoru can run on only GNU/Linux
 
-- Nim v1.4.8 or higher
+### Requires
+
+- Nim v1.6.0 or higher
+- libseccomp
 
 ```
 nimble install nicoru

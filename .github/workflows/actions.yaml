@@ -26,8 +26,8 @@ jobs:
     steps:
       - run: echo "Before job"
 
-  build:
-    name: build ${{ matrix.os }}
+  test:
+    name: test${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: before
     strategy:
@@ -63,8 +63,3 @@ jobs:
       run: |
         nimble refresh
         nimble test
-
-    - name: Build on Nim devel
-      run: |
-        choosenim -y devel
-        nimble build

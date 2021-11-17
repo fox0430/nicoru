@@ -1,4 +1,5 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils, options
+import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
+       linux
 import image, linuxutils, settings, cgroups, seccomputils, network
 
 type State = enum
