@@ -2,12 +2,16 @@ import posix, strformat, os, strutils, osproc, json, marshal, options
 import linuxutils, settings
 
 type
+  Veth = object
+    name: string
+    ip: Option[string]
+
   # TODO: Add network interface names
   # TODO: Fix type name
   IpList* = object
     containerId: string
-    cethIp: Option[string]
-    vethIp: Option[string]
+    ceth: Option[Veth]
+    veth: Option[Veth]
 
   Bridge* = object
     name: string
@@ -49,30 +53,62 @@ proc getActualInterfaceName(interfaceName: string): string =
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
 
+proc initVeth(name, ipAddr: string): Veth =
+  return Veth(name: name, ip: some(ipAddr))
+
+proc initIpList(containerId: string, ceth, veth: Veth): IpList =
+  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+
+proc initNetwork*(containerId, bridgeName: string): Network =
+  let
+    ipList = IpList(containerId: containerId,
+                    ceth: none(Veth),
+                    veth: none(Veth))
+
+    bridge = Bridge(name: bridgeName, ipList: @[ipList])
+
+  result = Network(bridges: @[bridge])
+
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     var bridge = Bridge(name: b["name"].getStr)
 
     for ip in b["ipList"]:
-      let
-        containerId = ip["containerId"].getStr
-        cethIp = if ip["cethIp"]["has"].getBool: some(ip["cethIp"]["val"].getStr)
-                 else: none(string)
-        vethIp = if ip["vethIp"]["has"].getBool: some(ip["vethIp"]["val"].getStr)
-                 else: none(string)
+      let containerId = ip["containerId"].getStr
 
-      bridge.ipList.add IpList(containerId: containerId, cethIp: cethIp, vethIp: vethIp)
+      var ipList = IpList(containerId: containerId)
+
+      let cethJson = ip["ceth"]
+      if cethJson["has"].getBool:
+        let
+          cethName = cethJson["val"]["name"].getStr
+
+          ipAddr = if cethJson["val"]["ip"]["has"].getBool:
+                     some(cethJson["val"]["ip"]["val"].getStr)
+                   else:
+                     none(string)
+
+          ceth = Veth(name: cethName, ip: ipAddr)
+
+        ipList.ceth = some(ceth)
+
+      let vethJson = ip["veth"]
+      if vethJson["has"].getBool:
+        let
+          vethName = vethJson["val"]["name"].getStr
+
+          ipAddr = if vethJson["val"]["ip"]["has"].getBool:
+                     some(vethJson["val"]["ip"]["val"].getStr)
+                   else:
+                     none(string)
+
+          veth = Veth(name: vethName, ip: ipAddr)
+
+        ipList.veth = some(veth)
+
+        bridge.ipList.add ipList
 
     result.bridges.add bridge
-
-proc initNetwork*(containerId: string): Network =
-  let
-    ipList = IpList(containerId: containerId,
-                    cethIp: none(string),
-                    vethIp: none(string))
-
-    bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
-  result = Network(bridges: @[bridge])
 
 # Write/Overwrite a network_state.json
 proc updateNetworkState(network: Network, networkStatePath: string) =
@@ -100,7 +136,8 @@ proc newIpList*(bridge: Bridge, containerId: string): IpList =
   var maxNum = 0
   for ip in bridge.iplist:
     let
-      ipAddr = ip.vethIp.get
+      veth = ip.veth.get
+      ipAddr = veth.ip.get
       splitedIpAddr = ipAddr.split("/")
       numStr = (splitedIpAddr[0].join.split("."))[^1]
       num = numStr.parseInt
@@ -109,11 +146,12 @@ proc newIpList*(bridge: Bridge, containerId: string): IpList =
 
   let
     newCethIpAddr = fmt"10.0.0.{maxNum + 1}/24"
-    newVethIpAddr = fmt"10.0.0.{maxNum + 2}/24"
+    ceth = Veth(name: "ceth", ip: some(newCethIpAddr))
 
-  return IpList(containerId: containerId,
-                cethIp: some(newCethIpAddr),
-                vethIp: some(newVethIpAddr))
+    newVethIpAddr = fmt"10.0.0.{maxNum + 2}/24"
+    veth = Veth(name: "veth", ip: some(newVethIpAddr))
+
+  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
 proc add*(bridge: var Bridge, ipList: IpList) =
   bridge.ipList.add(ipList)
@@ -172,8 +210,9 @@ proc createVirtualEthnet*(hostInterfaceName, containerInterfaceName: string) =
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
 # TODO: Add type for IP address
-proc addIpAddrToVeth*(interfaceName, ipAddr: string) =
+proc addIpAddrToVeth*(interfaceName: string, veth: Veth) =
   let
+    ipAddr = veth.ip.get
     cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
     r = execShellCmd(cmd)
 
@@ -204,7 +243,7 @@ proc addInterfaceToContainer*(
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   upNetworkInterface(hostInterfaceName)
-  addIpAddrToVeth(hostInterfaceName, ipList.cethIp.get)
+  addIpAddrToVeth(hostInterfaceName, ipList.ceth.get)
 
 proc createBridge*(bridgeName: string) =
   block:
@@ -258,5 +297,5 @@ proc initContainerNetwork*(
   # Wait for a network interface to be ready.
   waitInterfaceReady(containerInterfaceName)
 
-  addIpAddrToVeth(containerInterfaceName, ipList.vethIp.get)
+  addIpAddrToVeth(containerInterfaceName, ipList.veth.get)
   upNetworkInterface(containerInterfaceName)

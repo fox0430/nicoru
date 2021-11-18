@@ -338,7 +338,7 @@ proc execContainer*(settings: RuntimeSettings,
     CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
 
   # TODO: Remove
-  var network = initNetwork(containerId)
+  var network = initNetwork(containerId, defaultBridgeName())
   let
     bridgeIndex = network.bridges.getCurrentBrigeIndex(bridgeName)
     ipList = network.bridges[bridgeIndex.get].newIpList(containerId)
