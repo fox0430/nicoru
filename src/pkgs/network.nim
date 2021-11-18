@@ -109,6 +109,14 @@ proc toNetwork(json: JsonNode): Network =
 
     result.bridges.add bridge
 
+proc getCethName*(ipList: IpList): Option[string] =
+  if ipList.ceth.isSome:
+    return some(ipList.ceth.get.name)
+
+proc getVethName*(ipList: IpList): Option[string] =
+  if ipList.veth.isSome:
+    return some(ipList.veth.get.name)
+
 # Write/Overwrite a network_state.json
 proc updateNetworkState(network: Network, networkStatePath: string) =
   let (dir, _, _) = networkStatePath.splitFile
@@ -233,7 +241,7 @@ proc upNetworkInterface*(interfaceName: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-proc createVirtualEthnet*(hostInterfaceName, containerInterfaceName: string) =
+proc createVeth*(hostInterfaceName, containerInterfaceName: string) =
   let
     cmd = fmt"ip link add name {hostInterfaceName} type veth peer name {containerInterfaceName}"
     r = execShellCmd(cmd)
@@ -312,23 +320,16 @@ proc setDefaulRoute*(bridgeName, ipAddr: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-# Generate a new network interface name for host
-#proc newHostNetworkInterfaceName*(baseHostInterfaceName: string,
-#                                  bridgeIndex: int): string {.inline.} =
-#
-#  return baseHostInterfaceName & $bridgeIndex
-
 # TODO: Add type for IP address
-proc initContainerNetwork*(
-  ipList: IpList,
-  containerId, hostInterfaceName, containerInterfaceName, bridgeName: string) =
-
+proc initContainerNetwork*(ipList: IpList, containerId: string) =
+  # Up loopback interface
   block:
-    const DEVIC_ENAME = "lo"
-    upNetworkInterface(DEVIC_ENAME)
+    const LOOPBACK_INTERFACE= "lo"
+    upNetworkInterface(LOOPBACK_INTERFACE)
 
   # Wait for a network interface to be ready.
-  waitInterfaceReady(containerInterfaceName)
+  let cethName = ipList.getCethName.get
+  waitInterfaceReady(cethName)
 
-  addIpAddrToVeth(containerInterfaceName, ipList.veth.get)
-  upNetworkInterface(containerInterfaceName)
+  addIpAddrToVeth(cethName, ipList.veth.get)
+  upNetworkInterface(cethName)

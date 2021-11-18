@@ -341,16 +341,17 @@ proc execContainer*(settings: RuntimeSettings,
                                                         baseCethName(),
                                                         baseVethName())
 
+  # TODO: Remove
   echo ipList
 
   network.bridges[bridgeIndex.get].add ipList
 
   let
-    hostNetworkInterfaceName = ipList.veth.get.name
-    containerNetworkInterfaceName = ipList.ceth.get.name
+    hostNetworkInterfaceName = ipList.getVethName.get
+    containerNetworkInterfaceName = ipList.getCethName.get
 
-  createVirtualEthnet(hostNetworkInterfaceName,
-                      containerNetworkInterfaceName)
+  createVeth(hostNetworkInterfaceName,
+             containerNetworkInterfaceName)
 
   # TODO: Fix name
   let
@@ -371,11 +372,7 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Set up container network
       block:
-        initContainerNetwork(ipList,
-                             containerId,
-                             hostNetworkInterfaceName,
-                             CONTAINER_NETWORK_INTERFACE_NAME,
-                             bridgeName)
+        initContainerNetwork(ipList, containerId)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -482,7 +479,7 @@ proc execContainer*(settings: RuntimeSettings,
       addInterfaceToContainer(ipList,
                               containerId,
                               hostNetworkInterfaceName,
-                              CONTAINER_NETWORK_INTERFACE_NAME,
+                              containerNetworkInterfaceName,
                               pid.toPid)
 
       # Create a default bridge
