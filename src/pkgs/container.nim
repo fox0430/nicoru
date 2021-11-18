@@ -333,20 +333,30 @@ proc execContainer*(settings: RuntimeSettings,
     # TODO: Remove
     bridgeName = defaultBridgeName()
 
-  # TODO: Remove
-  var network = initNetwork(containerId, defaultBridgeName())
+  # TODO: Move
+  var network = loadNetworkState(networkStatePath())
+
+  if network.bridges.len == 0:
+    network.bridges.add initBridge(bridgeName)
+
+    let ipList = newIpList(containerId, baseCethName(), baseVethName())
+    network.bridges[0].ipList = @[ipList]
+  else:
+    let
+      bridgeIndex = (network.bridges.getCurrentBrigeIndex(bridgeName)).get
+      ipList = network.bridges[bridgeIndex].newIpList(
+        containerId,
+        baseCethName(),
+        baseVethName())
+
+    network.bridges[bridgeIndex].ipList.add ipList
+
+  network.updateNetworkState(networkStatePath())
+
   let
-    bridgeIndex = network.bridges.getCurrentBrigeIndex(bridgeName)
-    ipList = network.bridges[bridgeIndex.get].newIpList(containerId,
-                                                        baseCethName(),
-                                                        baseVethName())
+    bridgeIndex = (network.bridges.getCurrentBrigeIndex(bridgeName)).get
+    ipList = network.bridges[bridgeIndex].ipList[^1]
 
-  # TODO: Remove
-  echo ipList
-
-  network.bridges[bridgeIndex.get].add ipList
-
-  let
     hostNetworkInterfaceName = ipList.getVethName.get
     containerNetworkInterfaceName = ipList.getCethName.get
 
@@ -500,7 +510,8 @@ proc execContainer*(settings: RuntimeSettings,
     else:
       config.exitContainer(State.dead, configPath)
 
-    #network.removeIpFromIpList(containerId)
+    network.removeIpFromIpList(bridgeName, containerId)
+    network.updateNetworkState(networkStatePath())
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 

@@ -1,4 +1,5 @@
-import posix, strformat, os, strutils, osproc, json, marshal, options
+import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
+import times
 import linuxutils, settings
 
 type
@@ -13,8 +14,8 @@ type
     veth: Option[Veth]
 
   Bridge* = object
-    name: string
-    ipList: seq[IpList]
+    name*: string
+    ipList*: seq[IpList]
 
   Network* = object
     bridges*: seq[Bridge]
@@ -58,15 +59,8 @@ proc initVeth(name, ipAddr: string): Veth =
 proc initIpList(containerId: string, ceth, veth: Veth): IpList =
   return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
-proc initNetwork*(containerId, bridgeName: string): Network =
-  let
-    ipList = IpList(containerId: containerId,
-                    ceth: none(Veth),
-                    veth: none(Veth))
-
-    bridge = Bridge(name: bridgeName, ipList: @[ipList])
-
-  result = Network(bridges: @[bridge])
+proc initBridge*(bridgeName: string): Bridge =
+  return Bridge(name: bridgeName, ipList: @[])
 
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
@@ -118,19 +112,25 @@ proc getVethName*(ipList: IpList): Option[string] =
     return some(ipList.veth.get.name)
 
 # Write/Overwrite a network_state.json
-proc updateNetworkState(network: Network, networkStatePath: string) =
+proc updateNetworkState*(network: Network, networkStatePath: string) =
   let (dir, _, _) = networkStatePath.splitFile
   if not dirExists(dir):
     createDir(runPath())
 
+  # TODO: Fix
   # TODO: Error handling
   let json = $$network
   writeFile(networkStatePath, $json)
 
 # Read a network_state.json
-proc readNetworkState(networkStatePath: string): Option[Network] =
+# If a network_state.json doesn't exist, return a new Network object.
+proc loadNetworkState*(networkStatePath: string): Network =
   if fileExists(networkStatePath):
+    # TODO: Error handling
     let json = parseFile(networkStatePath)
+    return json.toNetwork
+  else:
+    return Network(bridges: @[])
 
 proc getCurrentBrigeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int] =
   for index, b in bridges:
@@ -161,9 +161,9 @@ proc getNum(ipAddr: string): int =
   # TODO: Add Error handling
   return numStr.parseInt
 
-proc newVethIpAddr(bridge: Bridge): string =
+proc newVethIpAddr(iplist: seq[IpList]): string =
   var maxNum = 0
-  for ip in bridge.iplist:
+  for ip in iplist:
     if ip.ceth.isSome and ip.ceth.get.ip.isSome:
       let
         ipAddr = ip.ceth.get.ip.get
@@ -185,11 +185,25 @@ proc newVethIpAddr(bridge: Bridge): string =
 proc newIpList*(bridge: Bridge, containerId, baseCethName, baseVethName: string): IpList =
   let
     cethName = newCethName(bridge.ipList, baseCethName)
-    cethIpAddr = newVethIpAddr(bridge)
+    cethIpAddr = newVethIpAddr(bridge.ipList)
     ceth = Veth(name: cethName, ip: some(cethIpAddr))
 
     vethName = newCethName(bridge.ipList, baseVethName)
-    vethIpAddr = newVethIpAddr(bridge)
+    vethIpAddr = newVethIpAddr(bridge.ipList)
+    veth = Veth(name: vethName, ip: some(vethIpAddr))
+
+  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+
+proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
+  let
+    ipList: seq[IpList] = @[]
+
+    cethName = baseCethName & "0"
+    cethIpAddr = "10.0.0.1/24"
+    ceth = Veth(name: cethName, ip: some(cethIpAddr))
+
+    vethName = baseVethName & "0"
+    vethIpAddr = "10.0.0.2/24"
     veth = Veth(name: vethName, ip: some(vethIpAddr))
 
   return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
@@ -223,7 +237,7 @@ proc removeIpFromIpList*(network: var Network, bridgeName, containerId: string) 
     if b.name == bridgeName:
       for ipListIndex, ip in b.ipList:
         if ip.containerId == containerId:
-          network.bridges[bridgeIndex].ipList.delete(ipListIndex)
+          network.bridges[bridgeIndex].ipList.delete(ipListIndex .. ipListIndex)
           return
 
 proc checkIfExistNetworkInterface(interfaceName: string): bool =
