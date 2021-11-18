@@ -5,21 +5,21 @@ include src/pkgs/network
 suite "Update network_state.json":
   test "Write network_state.json":
 
-    # TODO: Fix
-    let containerId = $genOid()
-
-    var network = initNetwork(containerId, defaultBridgeName())
-
     const
       VETH_IP_ADDR = "10.0.0.1/24"
       CETH_IP_ADDR = "10.0.0.2/24"
 
     let
+      # TODO: Fix
+      containerId = $genOid()
+
       ceth = Veth(name: "ceth", ip: some(CETH_IP_ADDR))
       veth = Veth(name: "veth", ip: some(VETH_IP_ADDR))
       ipList = IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
-    network.bridges[0].ipList[0] = ipList
+      bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
+
+      network = Network(bridges: @[bridge])
 
     const NETWORK_STATE_PATH = "/tmp/network_state.json"
     updateNetworkState(network, NETWORK_STATE_PATH)
@@ -70,22 +70,21 @@ suite "Network object":
     check network.bridges[0].ipList[0].veth.get.ip.get == "10.0.0.1/24"
 
   test "Remove IP address from Network":
-    # TODO: Fix
-    let containerId = $genOid()
-
-    var network = initNetwork(containerId, defaultBridgeName())
-
     const
       CETH_IP_ADDR = "10.0.0.2/24"
       VETH_IP_ADDR = "10.0.0.1/24"
 
     let
-      ceth = initVeth("ceth", CETH_IP_ADDR)
-      veth = initVeth("veth", VETH_IP_ADDR)
+      # TODO: Fix
+      containerId = $genOid()
 
-      ipList = initIpList(containerId, ceth, veth)
+      ceth = Veth(name: "ceth", ip: some(CETH_IP_ADDR))
+      veth = Veth(name: "veth", ip: some(VETH_IP_ADDR))
+      ipList = IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
-    network.bridges[0].ipList[0] = ipList
+      bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
+
+    var network = Network(bridges: @[bridge])
 
     network.removeIpFromIpList(defaultBridgeName(), containerId)
 
