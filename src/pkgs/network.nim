@@ -6,7 +6,6 @@ type
     name: string
     ip: Option[string]
 
-  # TODO: Add network interface names
   # TODO: Fix type name
   IpList* = object
     containerId: string
