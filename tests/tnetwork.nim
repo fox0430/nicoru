@@ -46,6 +46,33 @@ suite "Update network_state.json":
     let vethJson = json["bridges"][0]["ipList"][0]["veth"]
     check vethJson == parseJson("""{"val":{"name":"veth","ip":{"val":"10.0.0.1/24","has":true}},"has":true}""")
 
+  test "Remove IpList and update":
+    const
+      VETH_IP_ADDR = "10.0.0.1/24"
+      CETH_IP_ADDR = "10.0.0.2/24"
+
+    let
+      # TODO: Fix
+      containerId = $genOid()
+
+      ceth = Veth(name: "ceth", ip: some(CETH_IP_ADDR))
+      veth = Veth(name: "veth", ip: some(VETH_IP_ADDR))
+      ipList = IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+
+      bridge = Bridge(name: defaultBridgeName(), ipList: @[ipList])
+
+    var network = Network(bridges: @[bridge])
+
+    const NETWORK_STATE_PATH = "/tmp/network_state.json"
+    updateNetworkState(network, NETWORK_STATE_PATH)
+
+    network.removeIpFromIpList(defaultBridgeName(), containerId)
+    updateNetworkState(network, NETWORK_STATE_PATH)
+
+    let json = parseFile(NETWORK_STATE_PATH)
+
+    check json == parseJson("""{"bridges":[{"name":"nicoru0","ipList":[]}]}""")
+
 suite "Network object":
   test "JsonNode to Network":
     let
@@ -69,7 +96,7 @@ suite "Network object":
     check network.bridges[0].ipList[0].veth.get.ip.isSome
     check network.bridges[0].ipList[0].veth.get.ip.get == "10.0.0.1/24"
 
-  test "Remove IP address from Network":
+  test "Remove IpList from Network":
     const
       CETH_IP_ADDR = "10.0.0.2/24"
       VETH_IP_ADDR = "10.0.0.1/24"
