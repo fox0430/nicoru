@@ -129,26 +129,60 @@ proc getCurrentBrigeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int
     if b.name == bridgeName:
       return some(index)
 
-# TODO: Add type for IP address
-# Get a new ipList (cethIp and vethIp)
-proc newIpList*(bridge: Bridge, containerId: string): IpList =
+proc newCethName(ipList: seq[IpList], baseName: string): string =
+  var countCeth = 0
+  for ip in ipList:
+    if ip.ceth.isSome:
+      countCeth.inc
+
+  return baseName & $countCeth
+
+proc newVethName(ipList: seq[IpList], baseName: string): string =
+  var countVeth = 0
+  for ip in ipList:
+    if ip.veth.isSome:
+      countVeth.inc
+
+  return baseName & $countVeth
+
+# TODO: Fix proc name
+proc getNum(ipAddr: string): int =
+  let
+    splitedIpAddr = ipAddr.split("/")
+    numStr = (splitedIpAddr[0].join.split("."))[^1]
+  # TODO: Add Error handling
+  return numStr.parseInt
+
+proc newVethIpAddr(bridge: Bridge): string =
   var maxNum = 0
   for ip in bridge.iplist:
-    let
-      veth = ip.veth.get
-      ipAddr = veth.ip.get
-      splitedIpAddr = ipAddr.split("/")
-      numStr = (splitedIpAddr[0].join.split("."))[^1]
-      num = numStr.parseInt
-    if num > maxNum:
-      maxNum = num
+    if ip.ceth.isSome and ip.ceth.get.ip.isSome:
+      let
+        ipAddr = ip.ceth.get.ip.get
+        num = getNum(ipAddr)
+      if num > maxNum:
+        maxNum = num
 
+    if ip.veth.isSome and ip.veth.get.ip.isSome:
+      let
+        ipAddr = ip.veth.get.ip.get
+        num = getNum(ipAddr)
+      if num > maxNum:
+        maxNum = num
+
+  return fmt"10.0.0.{maxNum + 1}/24"
+
+# TODO: Add type for IP address
+# Get a new ipList (cethIp and vethIp)
+proc newIpList*(bridge: Bridge, containerId, baseCethName, baseVethName: string): IpList =
   let
-    newCethIpAddr = fmt"10.0.0.{maxNum + 1}/24"
-    ceth = Veth(name: "ceth", ip: some(newCethIpAddr))
+    cethName = newCethName(bridge.ipList, baseCethName)
+    cethIpAddr = newVethIpAddr(bridge)
+    ceth = Veth(name: cethName, ip: some(cethIpAddr))
 
-    newVethIpAddr = fmt"10.0.0.{maxNum + 2}/24"
-    veth = Veth(name: "veth", ip: some(newVethIpAddr))
+    vethName = newCethName(bridge.ipList, baseVethName)
+    vethIpAddr = newVethIpAddr(bridge)
+    veth = Veth(name: vethName, ip: some(vethIpAddr))
 
   return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
@@ -279,10 +313,10 @@ proc setDefaulRoute*(bridgeName, ipAddr: string) =
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 # Generate a new network interface name for host
-proc newHostNetworkInterfaceName*(baseHostInterfaceName: string,
-                                  bridgeIndex: int): string {.inline.} =
-
-  return baseHostInterfaceName & $bridgeIndex
+#proc newHostNetworkInterfaceName*(baseHostInterfaceName: string,
+#                                  bridgeIndex: int): string {.inline.} =
+#
+#  return baseHostInterfaceName & $bridgeIndex
 
 # TODO: Add type for IP address
 proc initContainerNetwork*(

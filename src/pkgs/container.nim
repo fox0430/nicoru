@@ -333,24 +333,24 @@ proc execContainer*(settings: RuntimeSettings,
     # TODO: Remove
     bridgeName = defaultBridgeName()
 
-  const
-    BASE_HOST_NETWORK_INTERFACE_NAME = "nicoru-veth"
-    CONTAINER_NETWORK_INTERFACE_NAME = "ceth0"
-
   # TODO: Remove
   var network = initNetwork(containerId, defaultBridgeName())
   let
     bridgeIndex = network.bridges.getCurrentBrigeIndex(bridgeName)
-    ipList = network.bridges[bridgeIndex.get].newIpList(containerId)
+    ipList = network.bridges[bridgeIndex.get].newIpList(containerId,
+                                                        baseCethName(),
+                                                        baseVethName())
+
+  echo ipList
 
   network.bridges[bridgeIndex.get].add ipList
 
-  let hostNetworkInterfaceName = newHostNetworkInterfaceName(
-    BASE_HOST_NETWORK_INTERFACE_NAME,
-    bridgeIndex.get)
+  let
+    hostNetworkInterfaceName = ipList.veth.get.name
+    containerNetworkInterfaceName = ipList.ceth.get.name
 
   createVirtualEthnet(hostNetworkInterfaceName,
-                      CONTAINER_NETWORK_INTERFACE_NAME)
+                      containerNetworkInterfaceName)
 
   # TODO: Fix name
   let
