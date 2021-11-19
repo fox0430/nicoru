@@ -291,9 +291,6 @@ proc exitContainer(config: var ContainerConfig,
                    network: var Network,
                    bridgeName, configPath: string) =
 
-  # exit pivot_root
-  chroot(".")
-
   config.state = state
   config.updateContainerConfigJson(configPath)
 
