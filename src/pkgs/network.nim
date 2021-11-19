@@ -68,7 +68,7 @@ proc bridgeExists*(bridgeName: string): bool =
       let
         l = outputL.split(" ")
         # TODO: Error handling
-        interfaceName = l[1]
+        interfaceName = l[1][0 ..< l[1].high]
 
       if interfaceName == bridgeName:
         return true
