@@ -53,6 +53,25 @@ proc getActualInterfaceName(interfaceName: string): string =
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
 
+proc bridgeExists*(bridgeName: string): bool =
+  let
+    cmd = "ip a"
+    r = execCmdEx(cmd)
+
+  if r.exitCode != 0:
+    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
+
+  let outputLines = r.output.splitLines
+  for outputL in outputLines:
+    if outputL.len > 0 and outputL[0].isDigit:
+      let
+        l = outputL.split(" ")
+        # TODO: Error handling
+        interfaceName = l[1]
+
+      if interfaceName == bridgeName:
+        return true
+
 proc initVeth(name, ipAddr: string): Veth =
   return Veth(name: name, ip: some(ipAddr))
 
@@ -199,11 +218,11 @@ proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
     ipList: seq[IpList] = @[]
 
     cethName = baseCethName & "0"
-    cethIpAddr = "10.0.0.1/24"
+    cethIpAddr = "10.0.0.2/24"
     ceth = Veth(name: cethName, ip: some(cethIpAddr))
 
     vethName = baseVethName & "0"
-    vethIpAddr = "10.0.0.2/24"
+    vethIpAddr = "10.0.0.3/24"
     veth = Veth(name: vethName, ip: some(vethIpAddr))
 
   return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
@@ -318,6 +337,15 @@ proc createBridge*(bridgeName: string) =
     if r != 0:
       exception(fmt"Failed to '{cmd}': exitCode {r}")
 
+  block:
+    let
+      ipAddr = defaultBridgeIpAddr()
+      cmd = fmt"ip addr add {ipAddr} dev {bridgeName}"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
+
 proc connectVethToBridge*(interfaceName, bridgeName: string) =
   let
     cmd = fmt"ip link set {interfaceName} master {bridgeName}"
@@ -328,7 +356,7 @@ proc connectVethToBridge*(interfaceName, bridgeName: string) =
 
 proc setDefaulRoute*(bridgeName, ipAddr: string) =
   let
-    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} ! -o {bridgeName} -j MASQUERADE"
+    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {bridgeName} -j MASQUERADE"
     r = execShellCmd(cmd)
 
   if r != 0:

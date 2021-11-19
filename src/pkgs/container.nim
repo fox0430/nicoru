@@ -496,7 +496,8 @@ proc execContainer*(settings: RuntimeSettings,
                               pid.toPid)
 
       # Create a default bridge
-      createBridge(bridgeName)
+      if bridgeExists(bridgeName):
+        createBridge(bridgeName)
       connectVethToBridge(hostNetworkInterfaceName, bridgeName)
 
       # TODO: Remove

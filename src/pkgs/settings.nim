@@ -67,3 +67,7 @@ proc baseVethName*(): string =
 
 proc defaultBridgeName*(): string =
   return "nicoru0"
+
+# TODO: Add type for IP address
+proc defaultBridgeIpAddr*(): string =
+  return "10.0.0.1/16"
