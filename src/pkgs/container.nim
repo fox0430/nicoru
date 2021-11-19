@@ -288,13 +288,17 @@ proc createContainer*(settings: RuntimeSettings,
 
 proc exitContainer(config: var ContainerConfig,
                    state: State,
-                   configPath: string) =
+                   network: var Network,
+                   bridgeName, configPath: string) =
 
   # exit pivot_root
   chroot(".")
 
   config.state = state
   config.updateContainerConfigJson(configPath)
+
+  network.removeIpFromIpList(bridgeName, config.containerId)
+  network.updateNetworkState(networkStatePath())
 
 proc isCgroups(cgroups: CgroupsSettgings): bool {.inline.} =
   cgroups.cpu or cgroups.cpuCore or cgroups.memory
@@ -481,9 +485,6 @@ proc execContainer*(settings: RuntimeSettings,
         var buffer = alloc(INOTIFY_EVENT_SZIE)
         discard fd.read(buffer, INOTIFY_EVENT_SZIE)
 
-      network.removeIpFromIpList(bridgeName, containerId)
-      network.updateNetworkState(networkStatePath())
-
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
@@ -510,9 +511,9 @@ proc execContainer*(settings: RuntimeSettings,
 
     let configPath = "config.json"
     if WIFEXITED(status):
-      config.exitContainer(State.stop, configPath)
+      config.exitContainer(State.stop, network, bridgeName, configPath)
     else:
-      config.exitContainer(State.dead, configPath)
+      config.exitContainer(State.dead, network, bridgeName, configPath)
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 
