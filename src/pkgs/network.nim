@@ -132,7 +132,7 @@ proc loadNetworkState*(networkStatePath: string): Network =
   else:
     return Network(bridges: @[])
 
-proc getCurrentBrigeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int] =
+proc getCurrentBridgeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int] =
   for index, b in bridges:
     if b.name == bridgeName:
       return some(index)
@@ -318,7 +318,7 @@ proc createBridge*(bridgeName: string) =
     if r != 0:
       exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-proc connectVethToBrige*(interfaceName, bridgeName: string) =
+proc connectVethToBridge*(interfaceName, bridgeName: string) =
   let
     cmd = fmt"ip link set {interfaceName} master {bridgeName}"
     r = execShellCmd(cmd)

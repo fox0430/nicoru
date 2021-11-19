@@ -343,7 +343,7 @@ proc execContainer*(settings: RuntimeSettings,
     network.bridges[0].ipList = @[ipList]
   else:
     let
-      bridgeIndex = (network.bridges.getCurrentBrigeIndex(bridgeName)).get
+      bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
       ipList = network.bridges[bridgeIndex].newIpList(
         containerId,
         baseCethName(),
@@ -354,7 +354,7 @@ proc execContainer*(settings: RuntimeSettings,
   network.updateNetworkState(networkStatePath())
 
   let
-    bridgeIndex = (network.bridges.getCurrentBrigeIndex(bridgeName)).get
+    bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
     ipList = network.bridges[bridgeIndex].ipList[^1]
 
     hostNetworkInterfaceName = ipList.getVethName.get
@@ -497,7 +497,7 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Create a default bridge
       createBridge(bridgeName)
-      connectVethToBrige(hostNetworkInterfaceName, bridgeName)
+      connectVethToBridge(hostNetworkInterfaceName, bridgeName)
 
       # TODO: Remove
       const IP_ADDR = "10.0.0.0/16"
