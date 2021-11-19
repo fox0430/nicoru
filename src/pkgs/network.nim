@@ -13,6 +13,7 @@ type
     ceth: Option[Veth]
     veth: Option[Veth]
 
+  # TODO: Add IpAddr
   Bridge* = object
     name*: string
     ipList*: seq[IpList]
@@ -362,6 +363,14 @@ proc setDefaulRoute*(bridgeName, ipAddr: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
+proc setDefaultGateWay(ipAddr: string) =
+  let
+    cmd = fmt"ip route add default via {ipAddr}"
+    r = execShellCmd(cmd)
+
+  if r != 0:
+    exception(fmt"Failed to '{cmd}': exitCode {r}")
+
 # TODO: Add type for IP address
 proc initContainerNetwork*(ipList: IpList, containerId: string) =
   # Up loopback interface
@@ -375,3 +384,8 @@ proc initContainerNetwork*(ipList: IpList, containerId: string) =
 
   addIpAddrToVeth(cethName, ipList.veth.get)
   upNetworkInterface(cethName)
+
+  block:
+    # TODO: Fix
+    const IP_ADDR = "10.0.0.1"
+    setDefaultGateWay(IP_ADDR)
