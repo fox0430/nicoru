@@ -346,16 +346,15 @@ proc execContainer*(settings: RuntimeSettings,
     let ipList = newIpList(containerId, baseCethName(), baseVethName())
     network.bridges[0].ipList = @[ipList]
   else:
-    let
-      bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
-      ipList = network.bridges[bridgeIndex].newIpList(
+    let bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
+    network.bridges[bridgeIndex].addNewIpList(
         containerId,
         baseCethName(),
         baseVethName())
 
-    network.bridges[bridgeIndex].ipList.add ipList
-
   network.updateNetworkState(networkStatePath())
+
+  echo network.bridges[^1]
 
   let
     bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get

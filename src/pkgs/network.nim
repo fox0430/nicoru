@@ -201,18 +201,20 @@ proc newVethIpAddr(iplist: seq[IpList]): string =
   return fmt"10.0.0.{maxNum + 1}/24"
 
 # TODO: Add type for IP address
-# Get a new ipList (cethIp and vethIp)
-proc newIpList*(bridge: Bridge, containerId, baseCethName, baseVethName: string): IpList =
+# Add a new ipList to Bridge.ipList
+proc addNewIpList*(bridge: var Bridge, containerId, baseCethName, baseVethName: string) =
+  bridge.ipList.add IpList(containerId: containerId)
   let
     cethName = newCethName(bridge.ipList, baseCethName)
     cethIpAddr = newVethIpAddr(bridge.ipList)
     ceth = Veth(name: cethName, ip: some(cethIpAddr))
+  bridge.ipList[^1].ceth = some(ceth)
 
+  let
     vethName = newCethName(bridge.ipList, baseVethName)
     vethIpAddr = newVethIpAddr(bridge.ipList)
     veth = Veth(name: vethName, ip: some(vethIpAddr))
-
-  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+  bridge.ipList[^1].veth = some(veth)
 
 proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
   let
