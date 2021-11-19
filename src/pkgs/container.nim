@@ -363,6 +363,10 @@ proc execContainer*(settings: RuntimeSettings,
     hostNetworkInterfaceName = ipList.getVethName.get
     containerNetworkInterfaceName = ipList.getCethName.get
 
+  # Create a default bridge
+  if not bridgeExists(bridgeName):
+    createBridge(bridgeName)
+
   createVeth(hostNetworkInterfaceName,
              containerNetworkInterfaceName)
 
@@ -495,9 +499,6 @@ proc execContainer*(settings: RuntimeSettings,
                               containerNetworkInterfaceName,
                               pid.toPid)
 
-      # Create a default bridge
-      if bridgeExists(bridgeName):
-        createBridge(bridgeName)
       connectVethToBridge(hostNetworkInterfaceName, bridgeName)
 
       # TODO: Remove
