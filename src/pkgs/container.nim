@@ -481,6 +481,9 @@ proc execContainer*(settings: RuntimeSettings,
         var buffer = alloc(INOTIFY_EVENT_SZIE)
         discard fd.read(buffer, INOTIFY_EVENT_SZIE)
 
+      network.removeIpFromIpList(bridgeName, containerId)
+      network.updateNetworkState(networkStatePath())
+
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
@@ -509,9 +512,6 @@ proc execContainer*(settings: RuntimeSettings,
       config.exitContainer(State.stop, configPath)
     else:
       config.exitContainer(State.dead, configPath)
-
-    network.removeIpFromIpList(bridgeName, containerId)
-    network.updateNetworkState(networkStatePath())
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 
