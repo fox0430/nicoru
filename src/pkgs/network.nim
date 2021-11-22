@@ -53,6 +53,21 @@ proc getActualInterfaceName(interfaceName: string): string =
         # TODO: Add error handling
         result = splited[1].splitWhitespace[0]
 
+proc getDefaultNetworkInterface*(): string =
+  let
+    cmd = "ip route"
+    r = execCmdEx(cmd)
+
+  if r.exitCode != 0 or r.output.len == 0:
+    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
+
+  for l in r.output.split('\n'):
+    let splited = l.splitWhitespace
+    if splited[0] == "default":
+      for index, word in splited:
+        if "dev" == word:
+          return splited[index + 1]
+
 proc bridgeExists*(bridgeName: string): bool =
   let
     cmd = "ip a"
@@ -328,7 +343,6 @@ proc connectVethToBridge*(interfaceName, bridgeName: string) =
     cmd = fmt"ip link set {interfaceName} master {bridgeName}"
     r = execShellCmd(cmd)
 
-  echo cmd
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
@@ -381,9 +395,9 @@ proc createBridge*(bridgeName: string) =
   block:
     upNetworkInterface(bridgeName)
 
-proc setDefaulRoute*(bridgeName, ipAddr: string) =
+proc setNat*(interfaceName, ipAddr: string) =
   let
-    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {bridgeName} -j MASQUERADE"
+    cmd = fmt"iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o {interfaceName} -j MASQUERADE"
     r = execShellCmd(cmd)
 
   if r != 0:

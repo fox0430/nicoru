@@ -498,7 +498,9 @@ proc execContainer*(settings: RuntimeSettings,
 
       # TODO: Remove
       const IP_ADDR = "10.0.0.0/16"
-      setDefaulRoute(bridgeName, IP_ADDR)
+      let defaultInterface = getDefaultNetworkInterface()
+      # TODO: Move
+      setNat(defaultInterface, IP_ADDR)
 
     # TODO: Delete
     var status: cint
