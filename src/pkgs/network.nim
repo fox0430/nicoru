@@ -1,5 +1,4 @@
 import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
-import times
 import linuxutils, settings
 
 type
