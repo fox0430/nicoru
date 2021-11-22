@@ -359,8 +359,14 @@ proc execContainer*(settings: RuntimeSettings,
     containerNetworkInterfaceName = ipList.getCethName.get
 
   # Create a default bridge
+  # TODO: Move
   if not bridgeExists(bridgeName):
     createBridge(bridgeName)
+
+    # TODO: Remove IP_ADDR
+    const IP_ADDR = "10.0.0.0/16"
+    let defaultInterface = getDefaultNetworkInterface()
+    setNat(defaultInterface, IP_ADDR)
 
   createVeth(hostNetworkInterfaceName,
              containerNetworkInterfaceName)
@@ -495,12 +501,6 @@ proc execContainer*(settings: RuntimeSettings,
                               pid.toPid)
 
       connectVethToBridge(hostNetworkInterfaceName, bridgeName)
-
-      # TODO: Remove
-      const IP_ADDR = "10.0.0.0/16"
-      let defaultInterface = getDefaultNetworkInterface()
-      # TODO: Move
-      setNat(defaultInterface, IP_ADDR)
 
     # TODO: Delete
     var status: cint
