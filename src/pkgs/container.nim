@@ -351,8 +351,6 @@ proc execContainer*(settings: RuntimeSettings,
 
   network.updateNetworkState(networkStatePath())
 
-  echo network.bridges[^1]
-
   let
     bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
     ipList = network.bridges[bridgeIndex].ipList[^1]
