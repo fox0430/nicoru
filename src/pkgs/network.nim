@@ -202,18 +202,22 @@ proc newVethIpAddr(iplist: seq[IpList]): string =
 # TODO: Add type for IP address
 # Add a new ipList to Bridge.ipList
 proc addNewIpList*(bridge: var Bridge, containerId, baseCethName, baseVethName: string) =
-  bridge.ipList.add IpList(containerId: containerId)
-  let
-    cethName = newCethName(bridge.ipList, baseCethName)
-    cethIpAddr = newVethIpAddr(bridge.ipList)
-    ceth = Veth(name: cethName, ip: some(cethIpAddr))
-  bridge.ipList[^1].ceth = some(ceth)
+  var ipList = IpList(containerId: containerId)
 
-  let
-    vethName = newCethName(bridge.ipList, baseVethName)
-    vethIpAddr = newVethIpAddr(bridge.ipList)
-    veth = Veth(name: vethName, ip: some(vethIpAddr))
-  bridge.ipList[^1].veth = some(veth)
+  block:
+    let
+      cethName = newCethName(bridge.ipList, baseCethName)
+      cethIpAddr = newVethIpAddr(bridge.ipList)
+      ceth = Veth(name: cethName, ip: some(cethIpAddr))
+    ipList.ceth = some(ceth)
+
+  block:
+    let
+      vethName = newCethName(bridge.ipList, baseVethName)
+      veth = Veth(name: vethName, ip: none(string))
+    ipList.veth = some(veth)
+
+  bridge.ipList.add ipList
 
 proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
   let
@@ -224,8 +228,7 @@ proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
     ceth = Veth(name: cethName, ip: some(cethIpAddr))
 
     vethName = baseVethName & "0"
-    vethIpAddr = "10.0.0.3/24"
-    veth = Veth(name: vethName, ip: some(vethIpAddr))
+    veth = Veth(name: vethName, ip: none(string))
 
   return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
@@ -319,42 +322,64 @@ proc addInterfaceToContainer*(
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   upNetworkInterface(hostInterfaceName)
-  addIpAddrToVeth(hostInterfaceName, ipList.ceth.get)
-
-proc createBridge*(bridgeName: string) =
-  block:
-    if not checkIfExistNetworkInterface(bridgeName):
-      let
-        cmd = fmt"ip link add {bridgeName} type bridge"
-        r = execShellCmd(cmd)
-
-      if r != 0:
-        exception(fmt"Failed to '{cmd}': exitCode: {r}")
-
-  block:
-    let
-      cmd = fmt"ip link set {bridgeName} up"
-      r = execShellCmd(cmd)
-
-    if r != 0:
-      exception(fmt"Failed to '{cmd}': exitCode {r}")
-
-  block:
-    let
-      ipAddr = defaultBridgeIpAddr()
-      cmd = fmt"ip addr add {ipAddr} dev {bridgeName}"
-      r = execShellCmd(cmd)
-
-    if r != 0:
-      exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 proc connectVethToBridge*(interfaceName, bridgeName: string) =
   let
     cmd = fmt"ip link set {interfaceName} master {bridgeName}"
     r = execShellCmd(cmd)
 
+  echo cmd
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+proc createBridge*(bridgeName: string) =
+  block:
+    if not checkIfExistNetworkInterface(bridgeName):
+      block:
+        let
+          # TODO: Fix veth name
+          cmd = "ip link add name veth0 type veth peer name br-veth0"
+          r = execShellCmd(cmd)
+
+        if r != 0:
+          exception(fmt"Failed to '{cmd}': exitCode: {r}")
+
+      block:
+        let
+          cmd = fmt"ip link add {bridgeName} type bridge"
+          r = execShellCmd(cmd)
+
+        if r != 0:
+          exception(fmt"Failed to '{cmd}': exitCode: {r}")
+
+      block:
+        # TODO: Fix INTERFACE_NAME
+        const INTERFACE_NAME = "br-veth0"
+        connectVethToBridge(INTERFACE_NAME, bridgeName)
+
+  block:
+    # TODO: Fix INTERFACE_NAME
+    const INTERFACE_NAME = "veth0"
+    let
+      ipAddr = defaultBridgeIpAddr()
+      cmd = fmt"ip addr add {ipAddr} dev veth0"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+  block:
+    # TODO: Fix INTERFACE_NAME
+    const INTERFACE_NAME = "br-veth0"
+    upNetworkInterface(INTERFACE_NAME)
+
+  block:
+    # TODO: Fix INTERFACE_NAME
+    const INTERFACE_NAME = "veth0"
+    upNetworkInterface(INTERFACE_NAME)
+
+  block:
+    upNetworkInterface(bridgeName)
 
 proc setDefaulRoute*(bridgeName, ipAddr: string) =
   let
@@ -383,7 +408,7 @@ proc initContainerNetwork*(ipList: IpList, containerId: string) =
   let cethName = ipList.getCethName.get
   waitInterfaceReady(cethName)
 
-  addIpAddrToVeth(cethName, ipList.veth.get)
+  addIpAddrToVeth(cethName, ipList.ceth.get)
   upNetworkInterface(cethName)
 
   block:
