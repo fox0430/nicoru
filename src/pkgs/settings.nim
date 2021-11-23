@@ -55,29 +55,3 @@ proc netNsPath*(): string =
 
 proc runPath*(): string =
   return "/var/run/nicoru"
-
-proc networkStatePath*(): string =
-  return "/var/run/nicoru/network_state.json"
-
-proc baseVethName*(): string =
-  return "veth"
-
-proc baseBrVethName*(): string =
-  return "brVeth"
-
-proc defaultBridgeName*(): string =
-  return "nicoru0"
-
-# TODO: Add type for IP address
-proc defaultBridgeIpAddr*(): string =
-  return "10.0.0.1/16"
-
-proc defaultRtBridgeVethName*(): string =
-  return "rtVeth0"
-
-proc defaultRtRtBridgeVethName*(): string =
-  return "brRtVeth0"
-
-# TODO: Add type for IP address
-proc defaultNatAddress*(): string =
-  return "10.0.0.0/24"

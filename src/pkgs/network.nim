@@ -10,7 +10,7 @@ type
 
   Veth = object
     name: string
-    ipAddr: Option[string]
+    ipAddr: Option[IpAddr]
 
   NetworkInterface* = object
     containerId: string
@@ -32,6 +32,31 @@ type
   Network* = object
     bridges*: seq[Bridge]
     currentBridgeIndex*: int
+
+proc networkStatePath*(): string =
+  return "/var/run/nicoru/network_state.json"
+
+proc baseVethName*(): string =
+  return "veth"
+
+proc baseBrVethName*(): string =
+  return "brVeth"
+
+proc defaultBridgeName*(): string =
+  return "nicoru0"
+
+proc defaultBridgeIpAddr*(): IpAddr =
+  return IpAddr(address: "10.0.0.1", subnetMask: none(int))
+
+proc defaultRtBridgeVethName*(): string =
+  return "rtVeth0"
+
+proc defaultRtRtBridgeVethName*(): string =
+  return "brRtVeth0"
+
+# TODO: Add type for IP address
+proc defaultNatAddress*(): IpAddr =
+  return IpAddr(address: "10.0.0.0", subnetMask: some(16))
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -82,7 +107,7 @@ proc getDefaultNetworkInterface*(): string =
           return splited[index + 1]
 
 # TODO; IP address type 
-proc getRtVethIpAddr*(bridge: Bridge): string =
+proc getRtVethIpAddr*(bridge: Bridge): IpAddr =
   return bridge.rtVeth.get.ipAddr.get
 
 proc bridgeExists*(bridgeName: string): bool =
@@ -130,7 +155,12 @@ proc parseIpAdder*(str: string): IpAddr =
   else:
     exception(fmt"Failed to parseIpAdder: '{str}'")
 
-proc initVeth(name, ipAddr: string): Veth =
+proc `$`(ipAddr: IpAddr): string =
+  result = ipAddr.address
+  if ipAddr.subnetMask.isSome:
+    result &= $ipAddr.subnetMask.get
+
+proc initVeth(name: string, ipAddr: IpAddr): Veth =
   return Veth(name: name, ipAddr: some(ipAddr))
 
 proc initNetworkInterface(containerId: string,
@@ -155,7 +185,7 @@ proc toVeth(json: JsonNode): Veth =
   result.name = json["name"].getStr
 
   if json["ipAddr"]["has"].getBool:
-    let ipAddr = json["ipAddr"]["val"].getStr
+    let ipAddr = parseIpAdder(json["ipAddr"]["val"].getStr)
     result.ipAddr = some(ipAddr)
 
 proc toNetworkInterface(json: JsonNode): NetworkInterface =
@@ -255,14 +285,14 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
     if ip.veth.isSome and ip.veth.get.ipAddr.isSome:
       let
         ipAddr = ip.veth.get.ipAddr.get
-        num = getNum(ipAddr)
+        num = getNum(ipAddr.address)
       if num > maxNum:
         maxNum = num
 
     if ip.brVeth.isSome and ip.brVeth.get.ipAddr.isSome:
       let
         ipAddr = ip.brVeth.get.ipAddr.get
-        num = getNum(ipAddr)
+        num = getNum(ipAddr.address)
       if num > maxNum:
         maxNum = num
 
@@ -278,32 +308,17 @@ proc addNewNetworkInterface*(bridge: var Bridge, containerId,
   block:
     let
       vethName = newVethName(bridge.ifaces, baseVethName)
-      cethIpAddr = newVethIpAddr(bridge.ifaces)
-      veth = Veth(name: vethName, ipAddr: some(cethIpAddr))
+      ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: none(int))
+      veth = Veth(name: vethName, ipAddr: some(ipAddr))
     iface.veth = some(veth)
 
   block:
     let
       brVethName = newBrVethName(bridge.ifaces, baseBrVethName)
-      brVeth = Veth(name: brVethName, ipAddr: none(string))
+      brVeth = Veth(name: brVethName, ipAddr: none(IpAddr))
     iface.brVeth = some(brVeth)
 
   bridge.ifaces.add iface
-
-proc newNetworkInterface*(
-  containerId, baseVethName, baseBrVethName: string): NetworkInterface =
-
-  let
-    iface: seq[NetworkInterface] = @[]
-
-    vethName = baseVethName & "0"
-    vethIpAddr = "10.0.0.2/24"
-    veth = Veth(name: vethName, ipAddr: some(vethIpAddr))
-
-    brVethName = baseBrVethName & "0"
-    brVeth = Veth(name: brVethName, ipAddr: none(string))
-
-  return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
 proc add*(bridge: var Bridge, iface: NetworkInterface) =
   bridge.ifaces.add(iface)
@@ -445,7 +460,7 @@ proc createBridge*(bridge: Bridge) =
   upNetworkInterface(rtVethName)
   upNetworkInterface(bridgeName)
 
-proc setNat*(interfaceName, ipAddr: string) =
+proc setNat*(interfaceName: string, ipAddr: IpAddr) =
   let
     cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
     r = execShellCmd(cmd)
@@ -453,7 +468,7 @@ proc setNat*(interfaceName, ipAddr: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-proc setDefaultGateWay(ipAddr: string) =
+proc setDefaultGateWay(ipAddr: IpAddr) =
   let
     cmd = fmt"ip route add default via {ipAddr}"
     r = execShellCmd(cmd)
@@ -462,7 +477,7 @@ proc setDefaultGateWay(ipAddr: string) =
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 # TODO: Add type for IP address
-proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: string) =
+proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface
   block:
     const LOOPBACK_INTERFACE= "lo"
