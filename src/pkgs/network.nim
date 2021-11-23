@@ -181,11 +181,18 @@ proc initBridge*(bridgeName: string): Bridge =
                 brRtVeth: some(brRtVeth),
                 ifaces: @[])
 
+proc toIpAddr(json: JsonNode): IpAddr =
+  result.address = json["address"].getStr
+
+  if json["subnetMask"]["has"].getBool:
+    let subnetMask = json["subnetMask"]["val"].getInt
+    result.subnetMask = some(subnetMask)
+
 proc toVeth(json: JsonNode): Veth =
   result.name = json["name"].getStr
 
   if json["ipAddr"]["has"].getBool:
-    let ipAddr = parseIpAdder(json["ipAddr"]["val"].getStr)
+    let ipAddr = toIpAddr(json["ipAddr"]["val"])
     result.ipAddr = some(ipAddr)
 
 proc toNetworkInterface(json: JsonNode): NetworkInterface =
