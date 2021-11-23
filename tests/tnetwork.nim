@@ -128,9 +128,15 @@ suite "Network object":
 
     check network.bridges[0].ifaces.len == 0
 
-suite "parse IpAddr":
+suite "IpAddr type":
   test "parse IpAddr 1":
     check parseIpAdder("10.0.0.0") == IpAddr(address: "10.0.0.0", subnetMask: none(int))
 
   test "parse IpAddr 2":
     check parseIpAdder("10.0.0.0/24") == IpAddr(address: "10.0.0.0", subnetMask: some(24))
+
+  test "to string 1":
+    check "10.0.0.0" ==  $IpAddr(address: "10.0.0.0", subnetMask: none(int))
+
+  test "to string 2":
+    check "10.0.0.0/24" == $IpAddr(address: "10.0.0.0", subnetMask: some(24))
