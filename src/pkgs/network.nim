@@ -349,8 +349,8 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
 proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:
-      for ifaceIndex, ip in b.ifaces:
-        if ip.containerId == containerId:
+      for ifaceIndex, iface in b.ifaces:
+        if iface.containerId == containerId:
           network.bridges[bridgeIndex].ifaces.delete(ifaceIndex .. ifaceIndex)
           return
 
