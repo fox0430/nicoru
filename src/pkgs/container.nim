@@ -361,7 +361,8 @@ proc execContainer*(settings: RuntimeSettings,
   # Create a default bridge
   # TODO: Move
   if not bridgeExists(bridgeName):
-    createBridge(bridgeName)
+    # TODO: Fix
+    createBridge(network.bridges[^1])
 
     # TODO: Remove IP_ADDR
     const IP_ADDR = "10.0.0.0/16"

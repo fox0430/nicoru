@@ -8,22 +8,20 @@ type
     name: string
     ipAddr: Option[string]
 
-  # TODO: Fix type name
   NetworkInterface* = object
     containerId: string
     # Created inside a container
     veth: Option[Veth]
-    # Connect a bridge with veth
+    # Connect a bridge with veth (Doesn't have a IP Address)
     brVeth: Option[Veth]
 
-  # TODO: Add IpAddr
   Bridge* = object
     # Bridge name
     name*: string
-    # Connect a bridge with brVeth
-    veth: Option[Veth]
     # Connet to default NIC
     rtVeth: Option[Veth]
+    # Connect a bridge with rtVeth (Doesn't have a IP Address)
+    brRtVeth: Option[Veth]
     # veths for a container
     ifaces*: seq[NetworkInterface]
 
@@ -100,52 +98,58 @@ proc bridgeExists*(bridgeName: string): bool =
 proc initVeth(name, ipAddr: string): Veth =
   return Veth(name: name, ipAddr: some(ipAddr))
 
-proc initNetworkInterface(containerId: string, veth, brVeth: Veth): NetworkInterface =
-  return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
+proc initNetworkInterface(containerId: string,
+                          veth, brVeth: Veth): NetworkInterface =
+
+  return NetworkInterface(containerId: containerId,
+                          veth: some(veth),
+                          brVeth: some(brVeth))
 
 proc initBridge*(bridgeName: string): Bridge =
-  return Bridge(name: bridgeName, ifaces: @[])
+  let
+    rtVethIpAddr = some(defaultBridgeIpAddr())
+    rtVeth = Veth(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
+    brRtVeth = Veth(name: defaultRtRtBridgeVethName())
+
+  return Bridge(name: bridgeName,
+                rtVeth: some(rtVeth),
+                brRtVeth: some(brRtVeth),
+                ifaces: @[])
+
+proc toVeth(json: JsonNode): Veth =
+  result.name = json["val"]["name"].getStr
+
+  if json["val"]["ipAddr"]["has"].getBool:
+    let ipAddr = json["val"]["ipAddr"]["val"].getStr
+    result.ipAddr = some(ipAddr)
+
+proc toNetworkInterface(json: JsonNode): NetworkInterface =
+  let containerId = json["containerId"].getStr
+
+  result.containerId = containerId
+
+  if json["veth"]["has"].getBool:
+    let veth = toVeth(json["veth"]["val"])
+    result.veth = some(veth)
+
+  if json["brVeth"]["has"].getBool:
+    let brVeth = toVeth(json["brVeth"]["val"])
+    result.brVeth = some(brVeth)
+
+proc toBridge(json: JsonNode): Bridge =
+  result.name = json["name"].getStr
+
+  if json["rtVeth"]["has"].getBool:
+    let rtVeth = toVeth(json["rtVeth"]["val"])
+    result.rtVeth = some(rtVeth)
+
+  if json["brRtVeth"]["has"].getBool:
+    let brRtVeth = toVeth(json["brRtVeth"]["val"])
+    result.brRtVeth = some(brRtVeth)
 
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
-    var bridge = Bridge(name: b["name"].getStr)
-
-    for ip in b["iface"]:
-      let containerId = ip["containerId"].getStr
-
-      var iface = NetworkInterface(containerId: containerId)
-
-      let vethJson = ip["veth"]
-      if vethJson["has"].getBool:
-        let
-          vethName = vethJson["val"]["name"].getStr
-
-          ipAddr = if vethJson["val"]["ipAddr"]["has"].getBool:
-                     some(vethJson["val"]["ipAddr"]["val"].getStr)
-                   else:
-                     none(string)
-
-          veth = Veth(name: vethName, ipAddr: ipAddr)
-
-        iface.veth = some(veth)
-
-      let brVethJson = ip["brVeth"]
-      if vethJson["has"].getBool:
-        let
-          brVethName = brVethJson["val"]["name"].getStr
-
-          ipAddr = if brVethJson["val"]["ipAddr"]["has"].getBool:
-                     some(brVethJson["val"]["ip"]["val"].getStr)
-                   else:
-                     none(string)
-
-          brVeth = Veth(name: brVethName, ipAddr: ipAddr)
-
-        iface.brVeth = some(brVeth)
-
-        bridge.ifaces.add iface
-
-    result.bridges.add bridge
+    result.bridges.add toBridge(b)
 
 proc getCethName*(iface: NetworkInterface): Option[string] =
   if iface.veth.isSome:
@@ -362,13 +366,18 @@ proc connectVethToBridge*(interfaceName, bridgeName: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-proc createBridge*(bridgeName: string) =
+proc createBridge*(bridge: Bridge) =
+  let
+    bridgeName = bridge.name
+    rtVethName = bridge.rtVeth.get.name
+    brRtVethName = bridge.rtVeth.get.name
+
   block:
     if not checkIfExistNetworkInterface(bridgeName):
+
       block:
         let
-          # TODO: Fix veth name
-          cmd = "ip link add name veth0 type veth peer name br-veth0"
+          cmd = fmt"ip link add name {rtVethName} type veth peer name {brRtVethName}"
           r = execShellCmd(cmd)
 
         if r != 0:
@@ -383,33 +392,20 @@ proc createBridge*(bridgeName: string) =
           exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
       block:
-        # TODO: Fix INTERFACE_NAME
-        const INTERFACE_NAME = "br-veth0"
-        connectVethToBridge(INTERFACE_NAME, bridgeName)
+        connectVethToBridge(brRtVethName, bridgeName)
 
   block:
-    # TODO: Fix INTERFACE_NAME
-    const INTERFACE_NAME = "veth0"
     let
-      ipAddr = defaultBridgeIpAddr()
-      cmd = fmt"ip addr add {ipAddr} dev veth0"
+      ipAddr = bridge.rtVeth.get.ipAddr.get
+      cmd = fmt"ip addr add {ipAddr} dev {rtVethName}"
       r = execShellCmd(cmd)
 
     if r != 0:
       exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-  block:
-    # TODO: Fix INTERFACE_NAME
-    const INTERFACE_NAME = "br-veth0"
-    upNetworkInterface(INTERFACE_NAME)
-
-  block:
-    # TODO: Fix INTERFACE_NAME
-    const INTERFACE_NAME = "veth0"
-    upNetworkInterface(INTERFACE_NAME)
-
-  block:
-    upNetworkInterface(bridgeName)
+  upNetworkInterface(brRtVethName)
+  upNetworkInterface(rtVethName)
+  upNetworkInterface(bridgeName)
 
 proc setNat*(interfaceName, ipAddr: string) =
   let

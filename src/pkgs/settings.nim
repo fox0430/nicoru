@@ -71,3 +71,9 @@ proc defaultBridgeName*(): string =
 # TODO: Add type for IP address
 proc defaultBridgeIpAddr*(): string =
   return "10.0.0.1/16"
+
+proc defaultRtBridgeVethName*(): string =
+  return "rtVeth0"
+
+proc defaultRtRtBridgeVethName*(): string =
+  return "brRtVeth0"
