@@ -276,10 +276,9 @@ proc newBrVethName(iface: seq[NetworkInterface], baseName: string): string =
 
   return baseName & $countBrVeth
 
-# TODO: Fix proc name
-proc getNum(ipAddr: string): int =
+proc getRightEndNum(ipAddr: IpAddr): int =
   let
-    splitedIpAddr = ipAddr.split("/")
+    splitedIpAddr = ipAddr.address.split("/")
     numStr = (splitedIpAddr[0].join.split("."))[^1]
   # TODO: Add Error handling
   return numStr.parseInt
@@ -289,15 +288,13 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   for ip in iface:
     if ip.veth.isSome and ip.veth.get.ipAddr.isSome:
       let
-        ipAddr = ip.veth.get.ipAddr.get
-        num = getNum(ipAddr.address)
+        num = getRightEndNum(ip.veth.get.ipAddr.get)
       if num > maxNum:
         maxNum = num
 
     if ip.brVeth.isSome and ip.brVeth.get.ipAddr.isSome:
       let
-        ipAddr = ip.brVeth.get.ipAddr.get
-        num = getNum(ipAddr.address)
+        num = getRightEndNum(ip.brVeth.get.ipAddr.get)
       if num > maxNum:
         maxNum = num
 
