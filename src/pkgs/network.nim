@@ -11,8 +11,8 @@ type
   # TODO: Fix type name
   NetworkInterface* = object
     containerId: string
-    ceth: Option[Veth]
     veth: Option[Veth]
+    brVeth: Option[Veth]
 
   # TODO: Add IpAddr
   Bridge* = object
@@ -92,8 +92,8 @@ proc bridgeExists*(bridgeName: string): bool =
 proc initVeth(name, ipAddr: string): Veth =
   return Veth(name: name, ip: some(ipAddr))
 
-proc initNetworkInterface(containerId: string, ceth, veth: Veth): NetworkInterface =
-  return NetworkInterface(containerId: containerId, ceth: some(ceth), veth: some(veth))
+proc initNetworkInterface(containerId: string, veth, brVeth: Veth): NetworkInterface =
+  return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
 proc initBridge*(bridgeName: string): Bridge =
   return Bridge(name: bridgeName, ifaces: @[])
@@ -106,20 +106,6 @@ proc toNetwork(json: JsonNode): Network =
       let containerId = ip["containerId"].getStr
 
       var iface = NetworkInterface(containerId: containerId)
-
-      let cethJson = ip["ceth"]
-      if cethJson["has"].getBool:
-        let
-          cethName = cethJson["val"]["name"].getStr
-
-          ipAddr = if cethJson["val"]["ip"]["has"].getBool:
-                     some(cethJson["val"]["ip"]["val"].getStr)
-                   else:
-                     none(string)
-
-          ceth = Veth(name: cethName, ip: ipAddr)
-
-        iface.ceth = some(ceth)
 
       let vethJson = ip["veth"]
       if vethJson["has"].getBool:
@@ -135,17 +121,31 @@ proc toNetwork(json: JsonNode): Network =
 
         iface.veth = some(veth)
 
+      let brVethJson = ip["brVeth"]
+      if vethJson["has"].getBool:
+        let
+          brVethName = brVethJson["val"]["name"].getStr
+
+          ipAddr = if brVethJson["val"]["ip"]["has"].getBool:
+                     some(brVethJson["val"]["ip"]["val"].getStr)
+                   else:
+                     none(string)
+
+          brVeth = Veth(name: brVethName, ip: ipAddr)
+
+        iface.brVeth = some(brVeth)
+
         bridge.ifaces.add iface
 
     result.bridges.add bridge
 
 proc getCethName*(iface: NetworkInterface): Option[string] =
-  if iface.ceth.isSome:
-    return some(iface.ceth.get.name)
-
-proc getVethName*(iface: NetworkInterface): Option[string] =
   if iface.veth.isSome:
     return some(iface.veth.get.name)
+
+proc getVethName*(iface: NetworkInterface): Option[string] =
+  if iface.brVeth.isSome:
+    return some(iface.brVeth.get.name)
 
 # Write/Overwrite a network_state.json
 proc updateNetworkState*(network: Network, networkStatePath: string) =
@@ -176,20 +176,20 @@ proc getCurrentBridgeIndex*(
       return some(index)
 
 proc newCethName(iface: seq[NetworkInterface], baseName: string): string =
-  var countCeth = 0
-  for ip in iface:
-    if ip.ceth.isSome:
-      countCeth.inc
-
-  return baseName & $countCeth
-
-proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
   var countVeth = 0
   for ip in iface:
     if ip.veth.isSome:
       countVeth.inc
 
   return baseName & $countVeth
+
+proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
+  var countBrVeth = 0
+  for ip in iface:
+    if ip.veth.isSome:
+      countBrVeth.inc
+
+  return baseName & $countBrVeth
 
 # TODO: Fix proc name
 proc getNum(ipAddr: string): int =
@@ -202,16 +202,16 @@ proc getNum(ipAddr: string): int =
 proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   var maxNum = 0
   for ip in iface:
-    if ip.ceth.isSome and ip.ceth.get.ip.isSome:
+    if ip.veth.isSome and ip.veth.get.ip.isSome:
       let
-        ipAddr = ip.ceth.get.ip.get
+        ipAddr = ip.veth.get.ip.get
         num = getNum(ipAddr)
       if num > maxNum:
         maxNum = num
 
-    if ip.veth.isSome and ip.veth.get.ip.isSome:
+    if ip.brVeth.isSome and ip.brVeth.get.ip.isSome:
       let
-        ipAddr = ip.veth.get.ip.get
+        ipAddr = ip.brVeth.get.ip.get
         num = getNum(ipAddr)
       if num > maxNum:
         maxNum = num
@@ -220,36 +220,40 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
 
 # TODO: Add type for IP address
 # Add a new iface to Bridge.iface
-proc addNewNetworkInterface*(bridge: var Bridge, containerId, baseCethName, baseVethName: string) =
+proc addNewNetworkInterface*(bridge: var Bridge, containerId,
+                             baseVethName, baseBrVethName: string) =
+
   var iface = NetworkInterface(containerId: containerId)
 
   block:
     let
-      cethName = newCethName(bridge.ifaces, baseCethName)
+      vethName = newCethName(bridge.ifaces, baseVethName)
       cethIpAddr = newVethIpAddr(bridge.ifaces)
-      ceth = Veth(name: cethName, ip: some(cethIpAddr))
-    iface.ceth = some(ceth)
+      veth = Veth(name: vethName, ip: some(cethIpAddr))
+    iface.veth = some(veth)
 
   block:
     let
-      vethName = newCethName(bridge.ifaces, baseVethName)
-      veth = Veth(name: vethName, ip: none(string))
-    iface.veth = some(veth)
+      brVethName = newCethName(bridge.ifaces, baseBrVethName)
+      brVeth = Veth(name: brVethName, ip: none(string))
+    iface.veth = some(brVeth)
 
   bridge.ifaces.add iface
 
-proc newNetworkInterface*(containerId, baseCethName, baseVethName: string): NetworkInterface =
+proc newNetworkInterface*(
+  containerId, baseVethName, baseBrVethName: string): NetworkInterface =
+
   let
     iface: seq[NetworkInterface] = @[]
 
-    cethName = baseCethName & "0"
-    cethIpAddr = "10.0.0.2/24"
-    ceth = Veth(name: cethName, ip: some(cethIpAddr))
-
     vethName = baseVethName & "0"
-    veth = Veth(name: vethName, ip: none(string))
+    vethIpAddr = "10.0.0.2/24"
+    veth = Veth(name: vethName, ip: some(vethIpAddr))
 
-  return NetworkInterface(containerId: containerId, ceth: some(ceth), veth: some(veth))
+    brVethName = baseBrVethName & "0"
+    brVeth = Veth(name: brVethName, ip: none(string))
+
+  return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
 proc add*(bridge: var Bridge, iface: NetworkInterface) =
   bridge.ifaces.add(iface)
@@ -426,7 +430,7 @@ proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
   let cethName = iface.getCethName.get
   waitInterfaceReady(cethName)
 
-  addIpAddrToVeth(cethName, iface.ceth.get)
+  addIpAddrToVeth(cethName, iface.veth.get)
   upNetworkInterface(cethName)
 
   block:
