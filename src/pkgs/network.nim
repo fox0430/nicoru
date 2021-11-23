@@ -158,7 +158,7 @@ proc parseIpAdder*(str: string): IpAddr =
 proc `$`(ipAddr: IpAddr): string =
   result = ipAddr.address
   if ipAddr.subnetMask.isSome:
-    result &= $ipAddr.subnetMask.get
+    result &= "/" & $ipAddr.subnetMask.get
 
 proc initVeth(name: string, ipAddr: IpAddr): Veth =
   return Veth(name: name, ipAddr: some(ipAddr))
