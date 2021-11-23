@@ -375,7 +375,7 @@ proc createBridge*(bridge: Bridge) =
   let
     bridgeName = bridge.name
     rtVethName = bridge.rtVeth.get.name
-    brRtVethName = bridge.rtVeth.get.name
+    brRtVethName = bridge.brRtVeth.get.name
 
   block:
     if not checkIfExistNetworkInterface(bridgeName):
