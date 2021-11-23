@@ -327,54 +327,42 @@ proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
                     containersDir: string) =
 
-  let
-    containerId = config.containerId
-    imageId = config.imageId
+  let containerId = config.containerId
 
-    # TODO: Remove
-    bridgeName = defaultBridgeName()
+  var network = initNicoruNetwork()
 
-  # TODO: Move
-  var network = loadNetworkState(networkStatePath())
-
-  if network.bridges.len == 0:
-    network.bridges.add initBridge(bridgeName)
-
-    let iface = newNetworkInterface(containerId, baseVethName(), baseBrVethName())
-    network.bridges[0].ifaces = @[iface]
-  else:
-    let bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
-    network.bridges[bridgeIndex].addNewNetworkInterface(
-        containerId,
-        baseVethName(),
-        baseBrVethName())
+  network.bridges[network.currentBridgeIndex].addNewNetworkInterface(
+    containerId,
+    baseVethName(),
+    baseBrVethName())
 
   network.updateNetworkState(networkStatePath())
 
   let
-    bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
-    iface = network.bridges[bridgeIndex].ifaces[^1]
+    bridge = network.bridges[network.currentBridgeIndex]
+    bridgeName = bridge.name
+    iface = bridge.ifaces[^1]
 
   let
     hostNetworkInterfaceName = iface.getBrVethName.get
     containerNetworkInterfaceName = iface.getVethName.get
 
-  # Create a default bridge
-  # TODO: Move
-  if not bridgeExists(bridgeName):
-    # TODO: Fix
-    createBridge(network.bridges[^1])
+  # Create a user defined bridge
+  if defaultBridgeName() != bridge.name:
+    if not bridgeExists(bridgeName):
+      createBridge(network.bridges[^1])
 
-    # TODO: Remove IP_ADDR
-    const IP_ADDR = "10.0.0.0/16"
-    let defaultInterface = getDefaultNetworkInterface()
-    setNat(defaultInterface, IP_ADDR)
+  # TODO: Remove IP_ADDR
+  const IP_ADDR = "10.0.0.0/16"
+  let defaultInterface = getDefaultNetworkInterface()
+  setNat(defaultInterface, IP_ADDR)
 
-  createVeth(hostNetworkInterfaceName,
-             containerNetworkInterfaceName)
+  createVethPair(hostNetworkInterfaceName, containerNetworkInterfaceName)
 
-  # TODO: Fix name
   let
+    imageId = config.imageId
+
+    # TODO: Fix name
     containerDir = containersDir / containerId
 
     parentPid = getpid()
@@ -496,11 +484,7 @@ proc execContainer*(settings: RuntimeSettings,
 
     block:
       # Add network interface
-      addInterfaceToContainer(iface,
-                              containerId,
-                              hostNetworkInterfaceName,
-                              containerNetworkInterfaceName,
-                              pid.toPid)
+      addInterfaceToContainer(iface, pid.toPid)
 
       connectVethToBridge(hostNetworkInterfaceName, bridgeName)
 

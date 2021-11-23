@@ -27,6 +27,7 @@ type
 
   Network* = object
     bridges*: seq[Bridge]
+    currentBridgeIndex*: int
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -216,7 +217,7 @@ proc getNum(ipAddr: string): int =
   return numStr.parseInt
 
 proc newVethIpAddr(iface: seq[NetworkInterface]): string =
-  var maxNum = 0
+  var maxNum = 1
   for ip in iface:
     if ip.veth.isSome and ip.veth.get.ipAddr.isSome:
       let
@@ -318,7 +319,7 @@ proc upNetworkInterface*(interfaceName: string) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-proc createVeth*(hostInterfaceName, containerInterfaceName: string) =
+proc createVethPair*(hostInterfaceName, containerInterfaceName: string) =
   let
     cmd = fmt"ip link add name {hostInterfaceName} type veth peer name {containerInterfaceName}"
     r = execShellCmd(cmd)
@@ -348,20 +349,19 @@ proc waitInterfaceReady*(interfaceName: string) =
   else:
     exception("Failed to ip command in container")
 
-proc addInterfaceToContainer*(
-  iface: NetworkInterface,
-  containerId, hostInterfaceName, containerInterfaceName: string,
-  pid: Pid) =
-
+proc addInterfaceToContainer*(iface: NetworkInterface, pid: Pid) =
   block:
     let
+      containerInterfaceName = iface.veth.get.name
       cmd = fmt"ip link set {containerInterfaceName} netns {$pid}"
       r = execShellCmd(cmd)
 
     if r != 0:
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-  upNetworkInterface(hostInterfaceName)
+  block:
+    let hostInterfaceName = iface.brVeth.get.name
+    upNetworkInterface(hostInterfaceName)
 
 proc connectVethToBridge*(interfaceName, bridgeName: string) =
   let
@@ -447,3 +447,14 @@ proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
     # TODO: Fix
     const IP_ADDR = "10.0.0.1"
     setDefaultGateWay(IP_ADDR)
+
+proc initNicoruNetwork*(): Network =
+  const BRIDGE_NAME = defaultBridgeName()
+
+  result = loadNetworkState(networkStatePath())
+
+  if result.bridges.len == 0:
+    result.bridges.add initBridge(BRIDGE_NAME)
+
+  if not bridgeExists(BRIDGE_NAME):
+    createBridge(result.bridges[0])
