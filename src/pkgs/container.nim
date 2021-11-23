@@ -294,7 +294,7 @@ proc exitContainer(config: var ContainerConfig,
   config.state = state
   config.updateContainerConfigJson(configPath)
 
-  network.removeIpFromIpList(bridgeName, config.containerId)
+  network.removeIpFromNetworkInterface(bridgeName, config.containerId)
   network.updateNetworkState(networkStatePath())
 
 proc isCgroups(cgroups: CgroupsSettgings): bool {.inline.} =
@@ -340,11 +340,11 @@ proc execContainer*(settings: RuntimeSettings,
   if network.bridges.len == 0:
     network.bridges.add initBridge(bridgeName)
 
-    let ipList = newIpList(containerId, baseCethName(), baseVethName())
-    network.bridges[0].ipList = @[ipList]
+    let iface = newNetworkInterface(containerId, baseCethName(), baseVethName())
+    network.bridges[0].ifaces = @[iface]
   else:
     let bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
-    network.bridges[bridgeIndex].addNewIpList(
+    network.bridges[bridgeIndex].addNewNetworkInterface(
         containerId,
         baseCethName(),
         baseVethName())
@@ -353,10 +353,10 @@ proc execContainer*(settings: RuntimeSettings,
 
   let
     bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
-    ipList = network.bridges[bridgeIndex].ipList[^1]
+    iface = network.bridges[bridgeIndex].ifaces[^1]
 
-    hostNetworkInterfaceName = ipList.getVethName.get
-    containerNetworkInterfaceName = ipList.getCethName.get
+    hostNetworkInterfaceName = iface.getVethName.get
+    containerNetworkInterfaceName = iface.getCethName.get
 
   # Create a default bridge
   # TODO: Move
@@ -390,7 +390,7 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Set up container network
       block:
-        initContainerNetwork(ipList, containerId)
+        initContainerNetwork(iface, containerId)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -494,7 +494,7 @@ proc execContainer*(settings: RuntimeSettings,
 
     block:
       # Add network interface
-      addInterfaceToContainer(ipList,
+      addInterfaceToContainer(iface,
                               containerId,
                               hostNetworkInterfaceName,
                               containerNetworkInterfaceName,

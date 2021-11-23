@@ -9,7 +9,7 @@ type
     ip: Option[string]
 
   # TODO: Fix type name
-  IpList* = object
+  NetworkInterface* = object
     containerId: string
     ceth: Option[Veth]
     veth: Option[Veth]
@@ -17,7 +17,7 @@ type
   # TODO: Add IpAddr
   Bridge* = object
     name*: string
-    ipList*: seq[IpList]
+    ifaces*: seq[NetworkInterface]
 
   Network* = object
     bridges*: seq[Bridge]
@@ -92,20 +92,20 @@ proc bridgeExists*(bridgeName: string): bool =
 proc initVeth(name, ipAddr: string): Veth =
   return Veth(name: name, ip: some(ipAddr))
 
-proc initIpList(containerId: string, ceth, veth: Veth): IpList =
-  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+proc initNetworkInterface(containerId: string, ceth, veth: Veth): NetworkInterface =
+  return NetworkInterface(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
 proc initBridge*(bridgeName: string): Bridge =
-  return Bridge(name: bridgeName, ipList: @[])
+  return Bridge(name: bridgeName, ifaces: @[])
 
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     var bridge = Bridge(name: b["name"].getStr)
 
-    for ip in b["ipList"]:
+    for ip in b["iface"]:
       let containerId = ip["containerId"].getStr
 
-      var ipList = IpList(containerId: containerId)
+      var iface = NetworkInterface(containerId: containerId)
 
       let cethJson = ip["ceth"]
       if cethJson["has"].getBool:
@@ -119,7 +119,7 @@ proc toNetwork(json: JsonNode): Network =
 
           ceth = Veth(name: cethName, ip: ipAddr)
 
-        ipList.ceth = some(ceth)
+        iface.ceth = some(ceth)
 
       let vethJson = ip["veth"]
       if vethJson["has"].getBool:
@@ -133,19 +133,19 @@ proc toNetwork(json: JsonNode): Network =
 
           veth = Veth(name: vethName, ip: ipAddr)
 
-        ipList.veth = some(veth)
+        iface.veth = some(veth)
 
-        bridge.ipList.add ipList
+        bridge.ifaces.add iface
 
     result.bridges.add bridge
 
-proc getCethName*(ipList: IpList): Option[string] =
-  if ipList.ceth.isSome:
-    return some(ipList.ceth.get.name)
+proc getCethName*(iface: NetworkInterface): Option[string] =
+  if iface.ceth.isSome:
+    return some(iface.ceth.get.name)
 
-proc getVethName*(ipList: IpList): Option[string] =
-  if ipList.veth.isSome:
-    return some(ipList.veth.get.name)
+proc getVethName*(iface: NetworkInterface): Option[string] =
+  if iface.veth.isSome:
+    return some(iface.veth.get.name)
 
 # Write/Overwrite a network_state.json
 proc updateNetworkState*(network: Network, networkStatePath: string) =
@@ -168,22 +168,24 @@ proc loadNetworkState*(networkStatePath: string): Network =
   else:
     return Network(bridges: @[])
 
-proc getCurrentBridgeIndex*(bridges: seq[Bridge], bridgeName: string): Option[int] =
+proc getCurrentBridgeIndex*(
+  bridges: seq[Bridge], bridgeName: string): Option[int] =
+
   for index, b in bridges:
     if b.name == bridgeName:
       return some(index)
 
-proc newCethName(ipList: seq[IpList], baseName: string): string =
+proc newCethName(iface: seq[NetworkInterface], baseName: string): string =
   var countCeth = 0
-  for ip in ipList:
+  for ip in iface:
     if ip.ceth.isSome:
       countCeth.inc
 
   return baseName & $countCeth
 
-proc newVethName(ipList: seq[IpList], baseName: string): string =
+proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
   var countVeth = 0
-  for ip in ipList:
+  for ip in iface:
     if ip.veth.isSome:
       countVeth.inc
 
@@ -197,9 +199,9 @@ proc getNum(ipAddr: string): int =
   # TODO: Add Error handling
   return numStr.parseInt
 
-proc newVethIpAddr(iplist: seq[IpList]): string =
+proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   var maxNum = 0
-  for ip in iplist:
+  for ip in iface:
     if ip.ceth.isSome and ip.ceth.get.ip.isSome:
       let
         ipAddr = ip.ceth.get.ip.get
@@ -217,28 +219,28 @@ proc newVethIpAddr(iplist: seq[IpList]): string =
   return fmt"10.0.0.{maxNum + 1}/24"
 
 # TODO: Add type for IP address
-# Add a new ipList to Bridge.ipList
-proc addNewIpList*(bridge: var Bridge, containerId, baseCethName, baseVethName: string) =
-  var ipList = IpList(containerId: containerId)
+# Add a new iface to Bridge.iface
+proc addNewNetworkInterface*(bridge: var Bridge, containerId, baseCethName, baseVethName: string) =
+  var iface = NetworkInterface(containerId: containerId)
 
   block:
     let
-      cethName = newCethName(bridge.ipList, baseCethName)
-      cethIpAddr = newVethIpAddr(bridge.ipList)
+      cethName = newCethName(bridge.ifaces, baseCethName)
+      cethIpAddr = newVethIpAddr(bridge.ifaces)
       ceth = Veth(name: cethName, ip: some(cethIpAddr))
-    ipList.ceth = some(ceth)
+    iface.ceth = some(ceth)
 
   block:
     let
-      vethName = newCethName(bridge.ipList, baseVethName)
+      vethName = newCethName(bridge.ifaces, baseVethName)
       veth = Veth(name: vethName, ip: none(string))
-    ipList.veth = some(veth)
+    iface.veth = some(veth)
 
-  bridge.ipList.add ipList
+  bridge.ifaces.add iface
 
-proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
+proc newNetworkInterface*(containerId, baseCethName, baseVethName: string): NetworkInterface =
   let
-    ipList: seq[IpList] = @[]
+    iface: seq[NetworkInterface] = @[]
 
     cethName = baseCethName & "0"
     cethIpAddr = "10.0.0.2/24"
@@ -247,13 +249,13 @@ proc newIpList*(containerId, baseCethName, baseVethName: string): IpList =
     vethName = baseVethName & "0"
     veth = Veth(name: vethName, ip: none(string))
 
-  return IpList(containerId: containerId, ceth: some(ceth), veth: some(veth))
+  return NetworkInterface(containerId: containerId, ceth: some(ceth), veth: some(veth))
 
-proc add*(bridge: var Bridge, ipList: IpList) =
-  bridge.ipList.add(ipList)
+proc add*(bridge: var Bridge, iface: NetworkInterface) =
+  bridge.ifaces.add(iface)
 
 # TODO: Add type for IP address
-proc addIpToIpList(containerId, ipAddr: string) =
+proc addIpToNetworkInterface(containerId, ipAddr: string) =
   const filePath = networkStatePath()
 
   if fileExists(filePath):
@@ -261,10 +263,10 @@ proc addIpToIpList(containerId, ipAddr: string) =
     let json = parseFile(filePath)
 
     if json.contains("ips"):
-      var ipList = json["ips"]
-      ipList.add(%* {containerId: ipAddr})
+      var iface = json["ips"]
+      iface.add(%* {containerId: ipAddr})
 
-      let newJson = %* {"ips": ipList}
+      let newJson = %* {"ips": iface}
       writeFile(filePath, $newJson)
   else:
     let json = %* {"ips": [{containerId: ipAddr}]}
@@ -273,12 +275,12 @@ proc addIpToIpList(containerId, ipAddr: string) =
     writeFile(filePath, $json)
 
 # TODO: Add type for IP address
-proc removeIpFromIpList*(network: var Network, bridgeName, containerId: string) =
+proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:
-      for ipListIndex, ip in b.ipList:
+      for ifaceIndex, ip in b.ifaces:
         if ip.containerId == containerId:
-          network.bridges[bridgeIndex].ipList.delete(ipListIndex .. ipListIndex)
+          network.bridges[bridgeIndex].ifaces.delete(ifaceIndex .. ifaceIndex)
           return
 
 proc checkIfExistNetworkInterface(interfaceName: string): bool =
@@ -326,7 +328,7 @@ proc waitInterfaceReady*(interfaceName: string) =
     exception("Failed to ip command in container")
 
 proc addInterfaceToContainer*(
-  ipList: IpList,
+  iface: NetworkInterface,
   containerId, hostInterfaceName, containerInterfaceName: string,
   pid: Pid) =
 
@@ -414,17 +416,17 @@ proc setDefaultGateWay(ipAddr: string) =
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 # TODO: Add type for IP address
-proc initContainerNetwork*(ipList: IpList, containerId: string) =
+proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
   # Up loopback interface
   block:
     const LOOPBACK_INTERFACE= "lo"
     upNetworkInterface(LOOPBACK_INTERFACE)
 
   # Wait for a network interface to be ready.
-  let cethName = ipList.getCethName.get
+  let cethName = iface.getCethName.get
   waitInterfaceReady(cethName)
 
-  addIpAddrToVeth(cethName, ipList.ceth.get)
+  addIpAddrToVeth(cethName, iface.ceth.get)
   upNetworkInterface(cethName)
 
   block:
