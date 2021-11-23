@@ -147,15 +147,19 @@ proc toBridge(json: JsonNode): Bridge =
     let brRtVeth = toVeth(json["brRtVeth"]["val"])
     result.brRtVeth = some(brRtVeth)
 
+  if json["ifaces"].len > 0:
+    for ifaceJson in json["ifaces"].items:
+      result.ifaces.add toNetworkInterface(ifaceJson)
+
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     result.bridges.add toBridge(b)
 
-proc getCethName*(iface: NetworkInterface): Option[string] =
+proc getVethName*(iface: NetworkInterface): Option[string] =
   if iface.veth.isSome:
     return some(iface.veth.get.name)
 
-proc getVethName*(iface: NetworkInterface): Option[string] =
+proc getBrVethName*(iface: NetworkInterface): Option[string] =
   if iface.brVeth.isSome:
     return some(iface.brVeth.get.name)
 
@@ -187,18 +191,18 @@ proc getCurrentBridgeIndex*(
     if b.name == bridgeName:
       return some(index)
 
-proc newCethName(iface: seq[NetworkInterface], baseName: string): string =
+proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
   var countVeth = 0
-  for ip in iface:
-    if ip.veth.isSome:
+  for i in iface:
+    if i.veth.isSome:
       countVeth.inc
 
   return baseName & $countVeth
 
-proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
+proc newBrVethName(iface: seq[NetworkInterface], baseName: string): string =
   var countBrVeth = 0
-  for ip in iface:
-    if ip.veth.isSome:
+  for i in iface:
+    if i.veth.isSome:
       countBrVeth.inc
 
   return baseName & $countBrVeth
@@ -239,16 +243,16 @@ proc addNewNetworkInterface*(bridge: var Bridge, containerId,
 
   block:
     let
-      vethName = newCethName(bridge.ifaces, baseVethName)
+      vethName = newVethName(bridge.ifaces, baseVethName)
       cethIpAddr = newVethIpAddr(bridge.ifaces)
       veth = Veth(name: vethName, ipAddr: some(cethIpAddr))
     iface.veth = some(veth)
 
   block:
     let
-      brVethName = newCethName(bridge.ifaces, baseBrVethName)
+      brVethName = newBrVethName(bridge.ifaces, baseBrVethName)
       brVeth = Veth(name: brVethName, ipAddr: none(string))
-    iface.veth = some(brVeth)
+    iface.brVeth = some(brVeth)
 
   bridge.ifaces.add iface
 
@@ -324,9 +328,10 @@ proc createVeth*(hostInterfaceName, containerInterfaceName: string) =
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
 # TODO: Add type for IP address
-proc addIpAddrToVeth*(interfaceName: string, veth: Veth) =
+proc addIpAddrToVeth*(veth: Veth) =
   let
     ipAddr = veth.ipAddr.get
+    interfaceName = veth.name
     cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
     r = execShellCmd(cmd)
 
@@ -431,11 +436,12 @@ proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
     upNetworkInterface(LOOPBACK_INTERFACE)
 
   # Wait for a network interface to be ready.
-  let cethName = iface.getCethName.get
-  waitInterfaceReady(cethName)
+  let vethName = iface.getVethName.get
 
-  addIpAddrToVeth(cethName, iface.veth.get)
-  upNetworkInterface(cethName)
+  waitInterfaceReady(vethName)
+
+  addIpAddrToVeth(iface.veth.get)
+  upNetworkInterface(vethName)
 
   block:
     # TODO: Fix

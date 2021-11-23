@@ -59,11 +59,11 @@ proc runPath*(): string =
 proc networkStatePath*(): string =
   return "/var/run/nicoru/network_state.json"
 
-proc baseCethName*(): string =
-  return "ceth"
-
 proc baseVethName*(): string =
-  return "nicoru-veth"
+  return "veth"
+
+proc baseBrVethName*(): string =
+  return "brVeth"
 
 proc defaultBridgeName*(): string =
   return "nicoru0"

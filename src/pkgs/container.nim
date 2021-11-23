@@ -340,14 +340,14 @@ proc execContainer*(settings: RuntimeSettings,
   if network.bridges.len == 0:
     network.bridges.add initBridge(bridgeName)
 
-    let iface = newNetworkInterface(containerId, baseCethName(), baseVethName())
+    let iface = newNetworkInterface(containerId, baseVethName(), baseBrVethName())
     network.bridges[0].ifaces = @[iface]
   else:
     let bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
     network.bridges[bridgeIndex].addNewNetworkInterface(
         containerId,
-        baseCethName(),
-        baseVethName())
+        baseVethName(),
+        baseBrVethName())
 
   network.updateNetworkState(networkStatePath())
 
@@ -355,8 +355,9 @@ proc execContainer*(settings: RuntimeSettings,
     bridgeIndex = (network.bridges.getCurrentBridgeIndex(bridgeName)).get
     iface = network.bridges[bridgeIndex].ifaces[^1]
 
-    hostNetworkInterfaceName = iface.getVethName.get
-    containerNetworkInterfaceName = iface.getCethName.get
+  let
+    hostNetworkInterfaceName = iface.getBrVethName.get
+    containerNetworkInterfaceName = iface.getVethName.get
 
   # Create a default bridge
   # TODO: Move
