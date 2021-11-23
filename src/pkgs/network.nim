@@ -77,6 +77,10 @@ proc getDefaultNetworkInterface*(): string =
         if "dev" == word:
           return splited[index + 1]
 
+# TODO; IP address type 
+proc getRtVethIpAddr*(bridge: Bridge): string =
+  return bridge.rtVeth.get.ipAddr.get
+
 proc bridgeExists*(bridgeName: string): bool =
   let
     cmd = "ip a"
@@ -170,7 +174,6 @@ proc updateNetworkState*(network: Network, networkStatePath: string) =
   if not dirExists(dir):
     createDir(runPath())
 
-  # TODO: Fix
   # TODO: Error handling
   let json = $$network
   writeFile(networkStatePath, $json)
@@ -414,7 +417,7 @@ proc createBridge*(bridge: Bridge) =
 
 proc setNat*(interfaceName, ipAddr: string) =
   let
-    cmd = fmt"iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o {interfaceName} -j MASQUERADE"
+    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
     r = execShellCmd(cmd)
 
   if r != 0:
@@ -429,7 +432,7 @@ proc setDefaultGateWay(ipAddr: string) =
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 # TODO: Add type for IP address
-proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
+proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: string) =
   # Up loopback interface
   block:
     const LOOPBACK_INTERFACE= "lo"
@@ -443,10 +446,7 @@ proc initContainerNetwork*(iface: NetworkInterface, containerId: string) =
   addIpAddrToVeth(iface.veth.get)
   upNetworkInterface(vethName)
 
-  block:
-    # TODO: Fix
-    const IP_ADDR = "10.0.0.1"
-    setDefaultGateWay(IP_ADDR)
+  setDefaultGateWay(rtVethIpAddr)
 
 proc initNicoruNetwork*(): Network =
   const BRIDGE_NAME = defaultBridgeName()

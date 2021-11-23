@@ -352,10 +352,8 @@ proc execContainer*(settings: RuntimeSettings,
     if not bridgeExists(bridgeName):
       createBridge(network.bridges[^1])
 
-  # TODO: Remove IP_ADDR
-  const IP_ADDR = "10.0.0.0/16"
   let defaultInterface = getDefaultNetworkInterface()
-  setNat(defaultInterface, IP_ADDR)
+  setNat(defaultInterface, defaultNatAddress())
 
   createVethPair(hostNetworkInterfaceName, containerNetworkInterfaceName)
 
@@ -380,7 +378,7 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Set up container network
       block:
-        initContainerNetwork(iface, containerId)
+        iface.initContainerNetwork(bridge.getRtVethIpAddr)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 

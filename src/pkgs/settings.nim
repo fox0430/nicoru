@@ -77,3 +77,7 @@ proc defaultRtBridgeVethName*(): string =
 
 proc defaultRtRtBridgeVethName*(): string =
   return "brRtVeth0"
+
+# TODO: Add type for IP address
+proc defaultNatAddress*(): string =
+  return "10.0.0.0/24"
