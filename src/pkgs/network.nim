@@ -303,7 +303,7 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
       if num > maxNum:
         maxNum = num
 
-  return fmt"10.0.0.{maxNum + 1}/24"
+  return fmt"10.0.0.{maxNum + 1}"
 
 # TODO: Add type for IP address
 # Add a new iface to Bridge.iface
@@ -315,7 +315,7 @@ proc addNewNetworkInterface*(bridge: var Bridge, containerId,
   block:
     let
       vethName = newVethName(bridge.ifaces, baseVethName)
-      ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: none(int))
+      ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: some(24))
       veth = Veth(name: vethName, ipAddr: some(ipAddr))
     iface.veth = some(veth)
 
