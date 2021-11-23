@@ -6,17 +6,25 @@ import linuxutils, settings
 type
   Veth = object
     name: string
-    ip: Option[string]
+    ipAddr: Option[string]
 
   # TODO: Fix type name
   NetworkInterface* = object
     containerId: string
+    # Created inside a container
     veth: Option[Veth]
+    # Connect a bridge with veth
     brVeth: Option[Veth]
 
   # TODO: Add IpAddr
   Bridge* = object
+    # Bridge name
     name*: string
+    # Connect a bridge with brVeth
+    veth: Option[Veth]
+    # Connet to default NIC
+    rtVeth: Option[Veth]
+    # veths for a container
     ifaces*: seq[NetworkInterface]
 
   Network* = object
@@ -90,7 +98,7 @@ proc bridgeExists*(bridgeName: string): bool =
         return true
 
 proc initVeth(name, ipAddr: string): Veth =
-  return Veth(name: name, ip: some(ipAddr))
+  return Veth(name: name, ipAddr: some(ipAddr))
 
 proc initNetworkInterface(containerId: string, veth, brVeth: Veth): NetworkInterface =
   return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
@@ -112,12 +120,12 @@ proc toNetwork(json: JsonNode): Network =
         let
           vethName = vethJson["val"]["name"].getStr
 
-          ipAddr = if vethJson["val"]["ip"]["has"].getBool:
-                     some(vethJson["val"]["ip"]["val"].getStr)
+          ipAddr = if vethJson["val"]["ipAddr"]["has"].getBool:
+                     some(vethJson["val"]["ipAddr"]["val"].getStr)
                    else:
                      none(string)
 
-          veth = Veth(name: vethName, ip: ipAddr)
+          veth = Veth(name: vethName, ipAddr: ipAddr)
 
         iface.veth = some(veth)
 
@@ -126,12 +134,12 @@ proc toNetwork(json: JsonNode): Network =
         let
           brVethName = brVethJson["val"]["name"].getStr
 
-          ipAddr = if brVethJson["val"]["ip"]["has"].getBool:
+          ipAddr = if brVethJson["val"]["ipAddr"]["has"].getBool:
                      some(brVethJson["val"]["ip"]["val"].getStr)
                    else:
                      none(string)
 
-          brVeth = Veth(name: brVethName, ip: ipAddr)
+          brVeth = Veth(name: brVethName, ipAddr: ipAddr)
 
         iface.brVeth = some(brVeth)
 
@@ -202,16 +210,16 @@ proc getNum(ipAddr: string): int =
 proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   var maxNum = 0
   for ip in iface:
-    if ip.veth.isSome and ip.veth.get.ip.isSome:
+    if ip.veth.isSome and ip.veth.get.ipAddr.isSome:
       let
-        ipAddr = ip.veth.get.ip.get
+        ipAddr = ip.veth.get.ipAddr.get
         num = getNum(ipAddr)
       if num > maxNum:
         maxNum = num
 
-    if ip.brVeth.isSome and ip.brVeth.get.ip.isSome:
+    if ip.brVeth.isSome and ip.brVeth.get.ipAddr.isSome:
       let
-        ipAddr = ip.brVeth.get.ip.get
+        ipAddr = ip.brVeth.get.ipAddr.get
         num = getNum(ipAddr)
       if num > maxNum:
         maxNum = num
@@ -229,13 +237,13 @@ proc addNewNetworkInterface*(bridge: var Bridge, containerId,
     let
       vethName = newCethName(bridge.ifaces, baseVethName)
       cethIpAddr = newVethIpAddr(bridge.ifaces)
-      veth = Veth(name: vethName, ip: some(cethIpAddr))
+      veth = Veth(name: vethName, ipAddr: some(cethIpAddr))
     iface.veth = some(veth)
 
   block:
     let
       brVethName = newCethName(bridge.ifaces, baseBrVethName)
-      brVeth = Veth(name: brVethName, ip: none(string))
+      brVeth = Veth(name: brVethName, ipAddr: none(string))
     iface.veth = some(brVeth)
 
   bridge.ifaces.add iface
@@ -248,10 +256,10 @@ proc newNetworkInterface*(
 
     vethName = baseVethName & "0"
     vethIpAddr = "10.0.0.2/24"
-    veth = Veth(name: vethName, ip: some(vethIpAddr))
+    veth = Veth(name: vethName, ipAddr: some(vethIpAddr))
 
     brVethName = baseBrVethName & "0"
-    brVeth = Veth(name: brVethName, ip: none(string))
+    brVeth = Veth(name: brVethName, ipAddr: none(string))
 
   return NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
@@ -314,7 +322,7 @@ proc createVeth*(hostInterfaceName, containerInterfaceName: string) =
 # TODO: Add type for IP address
 proc addIpAddrToVeth*(interfaceName: string, veth: Veth) =
   let
-    ipAddr = veth.ip.get
+    ipAddr = veth.ipAddr.get
     cmd = fmt"ip addr add {ipAddr} dev {interfaceName}"
     r = execShellCmd(cmd)
 
