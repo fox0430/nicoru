@@ -117,10 +117,10 @@ proc initBridge*(bridgeName: string): Bridge =
                 ifaces: @[])
 
 proc toVeth(json: JsonNode): Veth =
-  result.name = json["val"]["name"].getStr
+  result.name = json["name"].getStr
 
-  if json["val"]["ipAddr"]["has"].getBool:
-    let ipAddr = json["val"]["ipAddr"]["val"].getStr
+  if json["ipAddr"]["has"].getBool:
+    let ipAddr = json["ipAddr"]["val"].getStr
     result.ipAddr = some(ipAddr)
 
 proc toNetworkInterface(json: JsonNode): NetworkInterface =
