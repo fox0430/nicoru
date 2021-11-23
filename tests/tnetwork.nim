@@ -128,3 +128,10 @@ suite "Network object":
     network.removeIpFromNetworkInterface(defaultBridgeName(), containerId)
 
     check network.bridges[0].ifaces.len == 0
+
+suite "parse IpAddr":
+  test "parse IpAddr 1":
+    check parseIpAdder("10.0.0.0") == IpAddr(address: "10.0.0.0", subnetMask: none(int))
+
+  test "parse IpAddr 2":
+    check parseIpAdder("10.0.0.0/24") == IpAddr(address: "10.0.0.0", subnetMask: some(24))

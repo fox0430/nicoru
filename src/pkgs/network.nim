@@ -4,6 +4,10 @@ import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
 import linuxutils, settings
 
 type
+  IpAddr = object
+    address: string
+    subnetMask: Option[int]
+
   Veth = object
     name: string
     ipAddr: Option[string]
@@ -99,6 +103,32 @@ proc bridgeExists*(bridgeName: string): bool =
 
       if interfaceName == bridgeName:
         return true
+
+# TODO: Move
+proc isDigit(str: string): bool =
+  for c in str:
+    if not isDigit(c): return false
+  return true
+
+proc ipAddressValidate(str: string): bool =
+  let splited = str.split('.')
+  if splited.len == 4:
+    for str in splited:
+      if not isDigit(str): return false
+    return true
+
+proc parseIpAdder*(str: string): IpAddr =
+  let splited = str.split("/")
+
+  if splited.len == 1 and ipAddressValidate(splited[0]):
+    return IpAddr(address: splited[0], subnetMask: none(int))
+  elif splited.len == 2:
+    if ipAddressValidate(splited[0]) and isDigit(splited[1]):
+      return IpAddr(address: splited[0], subnetMask: some(parseInt(splited[1])))
+    else:
+      exception(fmt"Failed to parseIpAdder: '{str}'")
+  else:
+    exception(fmt"Failed to parseIpAdder: '{str}'")
 
 proc initVeth(name, ipAddr: string): Veth =
   return Veth(name: name, ipAddr: some(ipAddr))
