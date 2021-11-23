@@ -54,7 +54,6 @@ proc defaultRtBridgeVethName*(): string =
 proc defaultRtRtBridgeVethName*(): string =
   return "brRtVeth0"
 
-# TODO: Add type for IP address
 proc defaultNatAddress*(): IpAddr =
   return IpAddr(address: "10.0.0.0", subnetMask: some(16))
 
@@ -106,7 +105,6 @@ proc getDefaultNetworkInterface*(): string =
         if "dev" == word:
           return splited[index + 1]
 
-# TODO; IP address type 
 proc getRtVethIpAddr*(bridge: Bridge): IpAddr =
   return bridge.rtVeth.get.ipAddr.get
 
@@ -305,7 +303,6 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
 
   return fmt"10.0.0.{maxNum + 1}"
 
-# TODO: Add type for IP address
 # Add a new iface to Bridge.iface
 proc addNewNetworkInterface*(bridge: var Bridge, containerId,
                              baseVethName, baseBrVethName: string) =
@@ -330,7 +327,6 @@ proc addNewNetworkInterface*(bridge: var Bridge, containerId,
 proc add*(bridge: var Bridge, iface: NetworkInterface) =
   bridge.ifaces.add(iface)
 
-# TODO: Add type for IP address
 proc addIpToNetworkInterface(containerId, ipAddr: string) =
   const filePath = networkStatePath()
 
@@ -350,7 +346,6 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
     createDir(runPath())
     writeFile(filePath, $json)
 
-# TODO: Add type for IP address
 proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:
@@ -383,7 +378,6 @@ proc createVethPair*(hostInterfaceName, containerInterfaceName: string) =
   if r != 0 and r != 2:
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-# TODO: Add type for IP address
 proc addIpAddrToVeth*(veth: Veth) =
   let
     ipAddr = veth.ipAddr.get
@@ -483,7 +477,6 @@ proc setDefaultGateWay(ipAddr: IpAddr) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-# TODO: Add type for IP address
 proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface
   block:
