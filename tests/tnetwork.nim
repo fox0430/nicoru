@@ -50,12 +50,20 @@ suite "Update network_state.json":
     let
       # TODO: Fix
       containerId = $genOid()
-
-      veth = Veth(name: "veth", ipAddr: some(veth_IP_ADDR))
-      brVeth = Veth(name: "brVeth", ipAddr: none(string))
+      veth = Veth(name: "veth0", ipAddr: some(veth_IP_ADDR))
+      brVeth = Veth(name: "brVeth0", ipAddr: none(string))
       iface = NetworkInterface(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
-      bridge = Bridge(name: defaultBridgeName(), ifaces: @[iface])
+
+      rtVethIpAddr = some(defaultBridgeIpAddr())
+      rtVeth = Veth(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
+      brRtVeth = Veth(name: defaultRtRtBridgeVethName())
+
+      bridgeName = defaultBridgeName()
+      bridge = Bridge(name: bridgeName,
+                      rtVeth: some(rtVeth),
+                      brRtVeth: some(brRtVeth),
+                      ifaces: @[iface])
 
     var network = Network(bridges: @[bridge])
 
@@ -67,29 +75,40 @@ suite "Update network_state.json":
 
     let json = parseFile(NETWORK_STATE_PATH)
 
-    check json == parseJson("""{"bridges":[{"name":"nicoru0","veth":{"val":{"name":"","ipAddr":{"val":"","has":false}},"has":false},"rtVeth":{"val":{"name":"","ipAddr":{"val":"","has":false}},"has":false},"ifaces":[]}]}""")
+    check json == parseJson("""{"bridges":[{"name":"nicoru0","rtVeth":{"val":{"name":"rtVeth0","ipAddr":{"val":"10.0.0.1/16","has":true}},"has":true},"brRtVeth":{"val":{"name":"brRtVeth0","ipAddr":{"val":"","has":false}},"has":true},"ifaces":[]}]}""")
 
 suite "Network object":
   test "JsonNode to Network":
     let
-      json = parseJson("""{"bridges":[{"name":"nicoru0","iface":[{"containerId":"6196223e33df0dba12df4c55","veth":{"val":{"name":"veth","ipAddr":{"val":"10.0.0.2/24","has":true}},"has":true},"brVeth":{"val":{"name":"brVeth","ipAddr":{"val":"","has":false}},"has":true}}]}]}""")
+      json = parseJson("""{"bridges": [{"name": "nicoru0", "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": "10.0.0.1/16", "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": "", "has": false}}, "has": true}, "ifaces": [{"containerId": "619d25b67e9ab4021a34aef2", "veth": {"val": {"name": "veth0", "ipAddr": {"val": "10.0.0.2/24", "has": true}}, "has": true}, "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": "", "has": false}}, "has": true}}]}]}""")
 
-    let network = json.toNetwork
+      network = json.toNetwork
 
     check network.bridges.len == 1
-    check network.bridges[0].name == "nicoru0"
+    let bridge = network.bridges[0]
+    check bridge.name == "nicoru0"
 
-    check network.bridges[0].ifaces.len == 1
-    check network.bridges[0].ifaces[0].containerId == "6196223e33df0dba12df4c55"
+    check bridge.rtVeth.isSome
+    check bridge.rtVeth.get.name == "rtVeth0"
+    check bridge.rtVeth.get.ipAddr.isSome
+    check bridge.rtVeth.get.ipAddr.get == "10.0.0.1/16"
 
-    check network.bridges[0].ifaces[0].veth.isSome
-    check network.bridges[0].ifaces[0].veth.get.name == "veth"
-    check network.bridges[0].ifaces[0].veth.get.ipAddr.isSome
-    check network.bridges[0].ifaces[0].veth.get.ipAddr.get == "10.0.0.2/24"
+    check bridge.brRtVeth.isSome
+    check bridge.brRtVeth.get.name == "brRtVeth0"
+    check bridge.brRtVeth.get.ipAddr.isNone
 
-    check network.bridges[0].ifaces[0].brVeth.isSome
-    check network.bridges[0].ifaces[0].brVeth.get.name == "brVeth"
-    check network.bridges[0].ifaces[0].brVeth.get.ipAddr.isNone
+    check bridge.ifaces.len == 1
+    let iface = bridge.ifaces[0]
+    check iface.containerId == "619d25b67e9ab4021a34aef2"
+
+    check iface.veth.isSome
+    check iface.veth.get.name == "veth0"
+    check iface.veth.get.ipAddr.isSome
+    check iface.veth.get.ipAddr.get == "10.0.0.2/24"
+
+    check iface.brVeth.isSome
+    check iface.brVeth.get.name == "brVeth0"
+    check iface.brVeth.get.ipAddr.isNone
 
   test "Remove NetworkInterface from Network":
     const veth_IP_ADDR = "10.0.0.2/24"
