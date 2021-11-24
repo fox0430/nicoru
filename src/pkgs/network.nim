@@ -127,6 +127,21 @@ proc bridgeExists*(bridgeName: string): bool =
       if interfaceName == bridgeName:
         return true
 
+proc getVethIpAddr*(iface: NetworkInterface): IpAddr {.inline.} =
+  return iface.veth.get.ipAddr.get
+
+# TODO: Fix
+proc getPrimaryIpOfHost(): IpAddr =
+  let
+    cmd = "hostname --ip-address"
+    r = execCmdEx(cmd)
+
+  if r.exitCode != 0:
+    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
+
+  let splited = r.output.split(" ")
+  return IpAddr(address: splited[0])
+
 # TODO: Move
 proc isDigit(str: string): bool =
   for c in str:
@@ -486,6 +501,29 @@ proc setDefaultGateWay(ipAddr: IpAddr) =
 
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+proc setPortForward*(vethIpAddr: IpAddr, hPort, cPort: int) =
+  let
+    hostAddress = getPrimaryIpOfHost()
+    containerAddress = vethIpAddr.address
+
+  # External traffic
+  block:
+    let
+      cmd = fmt"iptables -t nat -A PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+  # Local traffic
+  block:
+    let
+      cmd = fmt "iptables -t nat -A OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+      r = execShellCmd(cmd)
+
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface
