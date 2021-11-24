@@ -168,6 +168,13 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   else:
     writeCmdLineError($args)
 
+proc isNetworkMode(str: string): bool {.inline.} =
+  case str:
+    of "bridge", "host", "none":
+      return true
+    else:
+      return false
+
 proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
@@ -177,16 +184,29 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     writeNotEnoughArgError("run", 1)
   else:
     let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
+
     # Enable/Disable background
     if cmdParseInfo.shortOptions.containsKey("b"):
       runtimeSettings.background = true
+
     # Enable/Disable seccomp
     if cmdParseInfo.longOptions.containsKey("seccomp"):
       runtimeSettings.seccomp = true
+
     # Set a path for a seccomp profile
-    if cmdParseInfo.longOptions.containsKey("seccomp-profile") and
-       cmdParseInfo.longOptions["seccomp-profile"].len > 0:
-      runtimeSettings.seccompProfilePath = cmdParseInfo.longOptions["seccomp-profile"]
+    if cmdParseInfo.longOptions.containsKey("seccomp-profile"):
+      if cmdParseInfo.longOptions["seccomp-profile"].len > 0:
+        runtimeSettings.seccompProfilePath = cmdParseInfo.longOptions["seccomp-profile"]
+      else:
+        writeCmdLineError($args)
+
+    # Set a network mode
+    if cmdParseInfo.longOptions.containsKey("net"):
+      if isNetworkMode(cmdParseInfo.longOptions["net"]):
+        runtimeSettings.networkMode = cmdParseInfo.longOptions["net"].toNetworkMode
+      else:
+        writeCmdLineError($args)
+
     if args.len > 1:
       let
         containersDir = runtimeSettings.baseDir / "containers"

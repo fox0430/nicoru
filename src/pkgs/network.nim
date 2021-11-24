@@ -301,23 +301,28 @@ proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   return fmt"10.0.0.{maxNum + 1}"
 
 # Add a new iface to Bridge.iface
-proc addNewNetworkInterface*(bridge: var Bridge, containerId,
-                             baseVethName, baseBrVethName: string) =
+proc addNewNetworkInterface*(bridge: var Bridge,
+                             containerId, baseVethName, baseBrVethName: string,
+                             isBridgeMode: bool) =
 
   var iface = NetworkInterface(containerId: containerId)
 
-  block:
-    let
-      vethName = newVethName(bridge.ifaces, baseVethName)
-      ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: some(24))
-      veth = Veth(name: vethName, ipAddr: some(ipAddr))
-    iface.veth = some(veth)
+  if isBridgeMode:
+    block:
+      let
+        vethName = newVethName(bridge.ifaces, baseVethName)
+        ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: some(24))
+        veth = Veth(name: vethName, ipAddr: some(ipAddr))
+      iface.veth = some(veth)
 
-  block:
-    let
-      brVethName = newBrVethName(bridge.ifaces, baseBrVethName)
-      brVeth = Veth(name: brVethName, ipAddr: none(IpAddr))
-    iface.brVeth = some(brVeth)
+    block:
+      let
+        brVethName = newBrVethName(bridge.ifaces, baseBrVethName)
+        brVeth = Veth(name: brVethName, ipAddr: none(IpAddr))
+      iface.brVeth = some(brVeth)
+  else:
+    iface.veth = none(Veth)
+    iface.brVeth = none(Veth)
 
   bridge.ifaces.add iface
 

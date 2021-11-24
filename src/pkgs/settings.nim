@@ -55,3 +55,12 @@ proc netNsPath*(): string =
 
 proc runPath*(): string =
   return "/var/run/nicoru"
+
+proc toNetworkMode*(str: string): NetworkMode =
+  case str:
+    of "bridge":
+      return NetworkMode.bridge
+    of "host":
+      return NetworkMode.host
+    of "none":
+      return NetworkMode.none

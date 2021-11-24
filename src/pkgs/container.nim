@@ -327,14 +327,18 @@ proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
                     containersDir: string) =
 
-  let containerId = config.containerId
+  let
+    containerId = config.containerId
+
+    isBridgeMode = NetworkMode.bridge == settings.networkMode
 
   var network = initNicoruNetwork()
 
   network.bridges[network.currentBridgeIndex].addNewNetworkInterface(
     containerId,
     baseVethName(),
-    baseBrVethName())
+    baseBrVethName(),
+    isBridgeMode)
 
   network.updateNetworkState(networkStatePath())
 
@@ -343,19 +347,16 @@ proc execContainer*(settings: RuntimeSettings,
     bridgeName = bridge.name
     iface = bridge.ifaces[^1]
 
-  let
-    hostNetworkInterfaceName = iface.getBrVethName.get
-    containerNetworkInterfaceName = iface.getVethName.get
-
   # Create a user defined bridge
   if defaultBridgeName() != bridge.name:
     if not bridgeExists(bridgeName):
       createBridge(network.bridges[^1])
 
-  let defaultInterface = getDefaultNetworkInterface()
-  setNat(defaultInterface, defaultNatAddress())
+  if isBridgeMode:
+    let defaultInterface = getDefaultNetworkInterface()
+    setNat(defaultInterface, defaultNatAddress())
 
-  createVethPair(hostNetworkInterfaceName, containerNetworkInterfaceName)
+    createVethPair(iface.getBrVethName.get, iface.getVethName.get)
 
   let
     imageId = config.imageId
@@ -377,7 +378,7 @@ proc execContainer*(settings: RuntimeSettings,
       let manifestJson = parseFile(settings.imagesHashPath(imageId))
 
       # Set up container network
-      block:
+      if isBridgeMode:
         iface.initContainerNetwork(bridge.getRtVethIpAddr)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
@@ -480,11 +481,11 @@ proc execContainer*(settings: RuntimeSettings,
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
-    block:
+    if isBridgeMode:
       # Add network interface
       addInterfaceToContainer(iface, pid.toPid)
 
-      connectVethToBridge(hostNetworkInterfaceName, bridgeName)
+      connectVethToBridge(iface.getBrVethName.get, bridgeName)
 
     # TODO: Delete
     var status: cint
