@@ -61,6 +61,7 @@ Options:
   --memorylimit         Limit memory
   --seccomp             Enable Seccomp
   --seccomp-profile     Seccomp profile path
+  --net                 Set Network mode
 """
 
 const startHelpMessage = """
