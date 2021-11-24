@@ -36,25 +36,25 @@ type
 proc networkStatePath*(): string =
   return "/var/run/nicoru/network_state.json"
 
-proc baseVethName*(): string =
+proc baseVethName*(): string {.inline.} =
   return "veth"
 
-proc baseBrVethName*(): string =
+proc baseBrVethName*(): string {.inline.} =
   return "brVeth"
 
-proc defaultBridgeName*(): string =
+proc defaultBridgeName*(): string {.inline.} =
   return "nicoru0"
 
-proc defaultBridgeIpAddr*(): IpAddr =
+proc defaultBridgeIpAddr*(): IpAddr {.inline.} =
   return IpAddr(address: "10.0.0.1", subnetMask: none(int))
 
-proc defaultRtBridgeVethName*(): string =
+proc defaultRtBridgeVethName*(): string {.inline.} =
   return "rtVeth0"
 
-proc defaultRtRtBridgeVethName*(): string =
+proc defaultRtRtBridgeVethName*(): string {.inline.} =
   return "brRtVeth0"
 
-proc defaultNatAddress*(): IpAddr =
+proc defaultNatAddress*(): IpAddr {.inline.} =
   return IpAddr(address: "10.0.0.0", subnetMask: some(16))
 
 proc getAllInterfaceName(): seq[string] =
@@ -106,7 +106,7 @@ proc getDefaultNetworkInterface*(): string =
         if "dev" == word:
           return splited[index + 1]
 
-proc getRtVethIpAddr*(bridge: Bridge): IpAddr =
+proc getRtVethIpAddr*(bridge: Bridge): IpAddr {.inline.} =
   return bridge.rtVeth.get.ipAddr.get
 
 proc bridgeExists*(bridgeName: string): bool =
