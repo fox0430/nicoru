@@ -46,7 +46,7 @@ proc defaultBridgeName*(): string {.inline.} =
   return "nicoru0"
 
 proc defaultBridgeIpAddr*(): IpAddr {.inline.} =
-  return IpAddr(address: "10.0.0.1", subnetMask: none(int))
+  return IpAddr(address: "10.0.0.1", subnetMask: some(16))
 
 proc defaultRtBridgeVethName*(): string {.inline.} =
   return "rtVeth0"
@@ -55,7 +55,7 @@ proc defaultRtRtBridgeVethName*(): string {.inline.} =
   return "brRtVeth0"
 
 proc defaultNatAddress*(): IpAddr {.inline.} =
-  return IpAddr(address: "10.0.0.0", subnetMask: some(16))
+  return IpAddr(address: "10.0.0.0", subnetMask: some(24))
 
 proc getAllInterfaceName(): seq[string] =
   let
@@ -480,7 +480,8 @@ proc setNat*(interfaceName: string, ipAddr: IpAddr) =
 
 proc setDefaultGateWay(ipAddr: IpAddr) =
   let
-    cmd = fmt"ip route add default via {ipAddr}"
+    address = ipAddr.address
+    cmd = fmt"ip route add default via {address}"
     r = execShellCmd(cmd)
 
   if r != 0:
