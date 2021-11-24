@@ -75,7 +75,7 @@ suite "Update network_state.json":
 
     let json = parseFile(NETWORK_STATE_PATH)
 
-    check json == parseJson("""{"bridges":[{"name":"nicoru0","rtVeth":{"val":{"name":"rtVeth0","ipAddr":{"val":{"address":"10.0.0.1","subnetMask":{"val":0,"has":false}},"has":true}},"has":true},"brRtVeth":{"val":{"name":"brRtVeth0","ipAddr":{"val":{"address":"","subnetMask":{"val":0,"has":false}},"has":false}},"has":true},"ifaces":[]}],"currentBridgeIndex":0}""")
+    check json == parseJson("""{"bridges":[{"name":"nicoru0","rtVeth":{"val":{"name":"rtVeth0","ipAddr":{"val":{"address":"10.0.0.1","subnetMask":{"val":16,"has":true}},"has":true}},"has":true},"brRtVeth":{"val":{"name":"brRtVeth0","ipAddr":{"val":{"address":"","subnetMask":{"val":0,"has":false}},"has":false}},"has":true},"ifaces":[]}],"currentBridgeIndex":0}""")
 
 suite "Network object":
   test "JsonNode to Network":
