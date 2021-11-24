@@ -87,8 +87,9 @@ proc getActualInterfaceName(interfaceName: string): string =
     for l in lines:
       if l.contains(interfaceName):
         let splited = l.split(":")
-        # TODO: Add error handling
-        result = splited[1].splitWhitespace[0]
+
+        try: result = splited[1].splitWhitespace[0]
+        except: exception(fmt"Failed to get actual interface name. Invalid value: '{splited}'")
 
 proc getDefaultNetworkInterface*(): string =
   let
@@ -121,7 +122,6 @@ proc bridgeExists*(bridgeName: string): bool =
     if outputL.len > 0 and outputL[0].isDigit:
       let
         l = outputL.split(" ")
-        # TODO: Error handling
         interfaceName = l[1][0 ..< l[1].high]
 
       if interfaceName == bridgeName:
@@ -239,7 +239,6 @@ proc updateNetworkState*(network: Network, networkStatePath: string) =
   if not dirExists(dir):
     createDir(runPath())
 
-  # TODO: Error handling
   let json = $$network
   writeFile(networkStatePath, $json)
 
@@ -247,9 +246,10 @@ proc updateNetworkState*(network: Network, networkStatePath: string) =
 # If a network_state.json doesn't exist, return a new Network object.
 proc loadNetworkState*(networkStatePath: string): Network =
   if fileExists(networkStatePath):
-    # TODO: Error handling
-    let json = parseFile(networkStatePath)
-    return json.toNetwork
+    try:
+      let json = parseFile(networkStatePath)
+      return json.toNetwork
+    except: exception(fmt"Failed to parse network_state.json. Please check {networkStatePath}")
   else:
     return Network(bridges: @[])
 
@@ -280,8 +280,9 @@ proc getRightEndNum(ipAddr: IpAddr): int =
   let
     splitedIpAddr = ipAddr.address.split("/")
     numStr = (splitedIpAddr[0].join.split("."))[^1]
-  # TODO: Add Error handling
-  return numStr.parseInt
+
+  try: return numStr.parseInt
+  except: exception(fmt"Failed to parse int: '{numStr}'")
 
 proc newVethIpAddr(iface: seq[NetworkInterface]): string =
   var maxNum = 1
@@ -333,8 +334,11 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
   const filePath = networkStatePath()
 
   if fileExists(filePath):
-    # TODO: Error handling
-    let json = parseFile(filePath)
+    let json = try:
+                 parseFile(filePath)
+               except:
+                 echo fmt"Failed to parseFile: '{filePath}'"
+                 quit(1)
 
     if json.contains("ips"):
       var iface = json["ips"]
@@ -344,9 +348,12 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
       writeFile(filePath, $newJson)
   else:
     let json = %* {"ips": [{containerId: ipAddr}]}
-    # TODO: Error handling
-    createDir(runPath())
-    writeFile(filePath, $json)
+
+    try: createDir(runPath())
+    except: exception(fmt"Failed to create a directory: '{runPath()}'")
+
+    try: writeFile(filePath, $json)
+    except: exception(fmt"Failed to write a json: '{filePath}'")
 
 proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
