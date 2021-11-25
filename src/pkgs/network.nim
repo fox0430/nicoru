@@ -130,9 +130,9 @@ proc bridgeExists*(bridgeName: string): bool =
 proc getVethIpAddr*(iface: NetworkInterface): IpAddr {.inline.} =
   return iface.veth.get.ipAddr.get
 
-# TODO: Fix
 proc getPrimaryIpOfHost(): IpAddr =
   let
+    # TODO: This method is not certain. Need fix it.
     cmd = "hostname --ip-address"
     r = execCmdEx(cmd)
 
@@ -143,7 +143,7 @@ proc getPrimaryIpOfHost(): IpAddr =
   return IpAddr(address: splited[0])
 
 # TODO: Move
-proc isDigit(str: string): bool =
+proc isDigit*(str: string): bool =
   for c in str:
     if not isDigit(c): return false
   return true

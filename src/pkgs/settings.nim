@@ -1,9 +1,14 @@
-import os
+import os, options
 
 type NetworkMode* {.pure.} = enum
   none
   bridge
   host
+
+# TODO: Move to network?
+type PublishPortPair* = object
+  host: int
+  container: int
 
 type RuntimeSettings* = object
   baseDir*: string
@@ -12,10 +17,14 @@ type RuntimeSettings* = object
   seccomp*: bool
   seccompProfilePath*: string
   networkMode*: NetworkMode
+  publishPort*: Option[PublishPortPair]
 
 proc initRuntimeSetting*(): RuntimeSettings {.inline.} =
   result.baseDir = getHomeDir() / ".local/share/nicoru"
   result.networkMode = NetworkMode.none
+
+proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
+  return PublishPortPair(host: hPort, container: cPort)
 
 proc shortId*(imageId: string): string {.inline.} =
   return imageId[7 .. ^1]

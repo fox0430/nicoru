@@ -1,4 +1,4 @@
-import parseopt, strformat, os, strutils, pegs
+import parseopt, strformat, os, strutils, pegs, options
 import settings, help, container, image, cgroups
 
 type CmdOption* = object
@@ -175,6 +175,28 @@ proc isNetworkMode(str: string): bool {.inline.} =
     else:
       return false
 
+# TODO: Move
+proc isDigit*(seqStr: seq[string]): bool =
+  for str in seqStr:
+    for c in str:
+      if not isDigit(c): return false
+  return true
+
+proc parsePublishPort(str: string): PublishPortPair =
+  if str.contains(':'):
+    let splited = str.split(":")
+    if splited.len == 2 and isDigit(splited):
+      let
+        hPort = parseInt(splited[0])
+        cPort = parseInt(splited[1])
+      return initPublishPortPair(hPort, cPort)
+    else:
+      # TODO: Fix this error
+      writeCmdLineError(fmt"Failed to parse port: '{str}'")
+  else:
+    # TODO: Fix this error
+    writeCmdLineError(fmt"Failed to parse port: '{str}'")
+
 proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
@@ -183,6 +205,8 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   elif args.len == 1:
     writeNotEnoughArgError("run", 1)
   else:
+    # TODO: Fix: Add validator for options
+
     let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
 
     # Enable/Disable background
@@ -202,10 +226,17 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
     # Set a network mode
     if cmdParseInfo.longOptions.containsKey("net"):
-      if isNetworkMode(cmdParseInfo.longOptions["net"]):
+      let networkMode = cmdParseInfo.longOptions["net"]
+      if isNetworkMode(networkMode):
         runtimeSettings.networkMode = cmdParseInfo.longOptions["net"].toNetworkMode
-      else:
-        writeCmdLineError($args)
+
+        if cmdParseInfo.longOptions.containsKey("port"):
+          if NetworkMode.bridge == runtimeSettings.networkMode:
+            let portPair = parsePublishPort(cmdParseInfo.longOptions["port"])
+            runtimeSettings.publishPort = some(portPair)
+          else:
+            # TODO: Fix
+            writeCmdLineError($args)
 
     if args.len > 1:
       let
