@@ -358,11 +358,8 @@ proc execContainer*(settings: RuntimeSettings,
 
     createVethPair(iface.getBrVethName.get, iface.getVethName.get)
 
-    # TODO: Fix port
-    let
-      hPort = 8080
-      cPort = 80
-    setPortForward(iface.getVethIpAddr, hPort, cPort)
+    if settings.publishPort.isSome:
+      setPortForward(iface.getVethIpAddr, settings.publishPort.get)
 
   let
     imageId = config.imageId

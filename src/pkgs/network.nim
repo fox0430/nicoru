@@ -502,8 +502,11 @@ proc setDefaultGateWay(ipAddr: IpAddr) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-proc setPortForward*(vethIpAddr: IpAddr, hPort, cPort: int) =
+proc setPortForward*(vethIpAddr: IpAddr, portPair: PublishPortPair) =
   let
+    hPort = portPair.host
+    cPort = portPair.container
+
     hostAddress = getPrimaryIpOfHost()
     containerAddress = vethIpAddr.address
 
