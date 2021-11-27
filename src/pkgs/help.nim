@@ -62,6 +62,7 @@ Options:
   --seccomp             Enable Seccomp
   --seccomp-profile     Seccomp profile path
   --net                 Set Network mode
+  --port                Publishing ports
 """
 
 const startHelpMessage = """
