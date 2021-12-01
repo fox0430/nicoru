@@ -140,7 +140,23 @@ proc getPrimaryIpOfHost(): IpAddr =
     exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
 
   let splited = r.output.split(" ")
-  return IpAddr(address: splited[0])
+  return IpAddr(address: splited[0].replace("\n", ""))
+
+proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
+  for bridge in bridges:
+    if bridge.name == bridgeName:
+      return bridge
+
+  exception(fmt"Bridge object not found: '{bridgeName}'")
+
+proc getNetworkInterface*(bridge: Bridge,
+                          containerId: string): NetworkInterface =
+
+  for iface in bridge.ifaces:
+    if iface.containerId == containerId:
+      return iface
+
+  exception(fmt"NetworkInterface object not found: '{containerId}'")
 
 # TODO: Move
 proc isDigit*(str: string): bool =
@@ -518,7 +534,9 @@ proc setPortForward*(vethIpAddr: IpAddr, portPair: PublishPortPair) =
     hPort = portPair.host
     cPort = portPair.container
 
+    # TODO: Remove
     hostAddress = getPrimaryIpOfHost()
+
     containerAddress = vethIpAddr.address
 
   # External traffic
@@ -539,6 +557,46 @@ proc setPortForward*(vethIpAddr: IpAddr, portPair: PublishPortPair) =
 
       if r != 0:
         exception(fmt"Failed to '{cmd}': exitCode {r}")
+
+proc removeIptablesRule(rule: string) =
+  if rule.contains(" -A "):
+    if iptablesRuleExist(rule):
+      discard execShellCmd(rule.replace(" -A ", " -D "))
+  elif rule.contains(" -D "):
+    discard execShellCmd(rule)
+  else:
+    exception(fmt"Invalid iptables rule: '{rule}'")
+
+proc removeContainerIptablesRule*(iface: NetworkInterface,
+                                  portPair: PublishPortPair) =
+
+  let
+    veth = iface.veth.get
+
+    # TODO: Remove
+    hostAddress = getPrimaryIpOfHost()
+
+    containerAddress = veth.ipAddr.get.address
+
+    hPort = portPair.host
+    cPort = portPair.container
+
+  block:
+    let cmd = fmt"iptables -t nat -D PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+    discard execShellCmd(cmd)
+
+  block:
+    let cmd = fmt "iptables -t nat -D OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+    discard execShellCmd(cmd)
+
+  block:
+    let
+      # TODO: Remove
+      ipAddr = defaultNatAddress()
+      # TODO: Remove
+      interfaceName = getDefaultNetworkInterface()
+
+      cmd = fmt"iptables -t nat -D POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
 
 proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface

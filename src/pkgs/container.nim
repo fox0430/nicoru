@@ -287,12 +287,20 @@ proc createContainer*(settings: RuntimeSettings,
       manifestJson = parseFile(imgHashPath / imageId[7 .. ^1])
 
 proc exitContainer(config: var ContainerConfig,
-                   state: State,
                    network: var Network,
+                   settings: RuntimeSettings,
+                   state: State,
                    bridgeName, configPath: string) =
 
   config.state = state
   config.updateContainerConfigJson(configPath)
+
+  if NetworkMode.bridge == settings.networkMode and
+     settings.publishPort.isSome:
+    let
+      bridge = network.bridges.getBridge(bridgeName)
+      iface = bridge.getNetworkInterface(config.containerId)
+    removeContainerIptablesRule(iface, settings.publishPort.get)
 
   network.removeIpFromNetworkInterface(bridgeName, config.containerId)
   network.updateNetworkState(networkStatePath())
@@ -496,9 +504,9 @@ proc execContainer*(settings: RuntimeSettings,
 
     let configPath = "config.json"
     if WIFEXITED(status):
-      config.exitContainer(State.stop, network, bridgeName, configPath)
+      config.exitContainer(network, settings, State.stop, bridgeName, configPath)
     else:
-      config.exitContainer(State.dead, network, bridgeName, configPath)
+      config.exitContainer(network, settings, State.dead, bridgeName, configPath)
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 
