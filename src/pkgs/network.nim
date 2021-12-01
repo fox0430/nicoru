@@ -485,13 +485,24 @@ proc createBridge*(bridge: Bridge) =
   upNetworkInterface(rtVethName)
   upNetworkInterface(bridgeName)
 
-proc setNat*(interfaceName: string, ipAddr: IpAddr) =
+# Check if an iptables rule already exists.
+# Use "iptables -C"
+proc iptablesRuleExist(rule: string): bool =
   let
-    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
-    r = execShellCmd(cmd)
+    cmd = rule.replace(" -A ", " -C ") & "; echo $?"
+    r = execCmdEx(cmd)
 
-  if r != 0:
-    exception(fmt"Failed to '{cmd}': exitCode {r}")
+  # 0 is already exist
+  if r.output == "0\n":
+    return true
+
+proc setNat*(interfaceName: string, ipAddr: IpAddr) =
+  let cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
+
+  if not iptablesRuleExist(cmd):
+    let r = execShellCmd(cmd)
+    if r != 0:
+      exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 proc setDefaultGateWay(ipAddr: IpAddr) =
   let
@@ -512,21 +523,22 @@ proc setPortForward*(vethIpAddr: IpAddr, portPair: PublishPortPair) =
 
   # External traffic
   block:
-    let
-      cmd = fmt"iptables -t nat -A PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
-      r = execShellCmd(cmd)
+    let cmd = fmt"iptables -t nat -A PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
 
-    if r != 0:
-      exception(fmt"Failed to '{cmd}': exitCode {r}")
+    if not iptablesRuleExist(cmd):
+      let r = execShellCmd(cmd)
+      if r != 0:
+        exception(fmt"Failed to '{cmd}': exitCode {r}")
 
   # Local traffic
   block:
-    let
-      cmd = fmt "iptables -t nat -A OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
-      r = execShellCmd(cmd)
+    let cmd = fmt "iptables -t nat -A OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
 
-    if r != 0:
-      exception(fmt"Failed to '{cmd}': exitCode {r}")
+    if not iptablesRuleExist(cmd):
+      let r = execShellCmd(cmd)
+
+      if r != 0:
+        exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface
