@@ -340,7 +340,17 @@ proc execContainer*(settings: RuntimeSettings,
 
     isBridgeMode = NetworkMode.bridge == settings.networkMode
 
-  var network = initNicoruNetwork()
+  while isLockedNetworkStateFile(networkStatePath()):
+    sleep 500
+
+  lockNetworkStatefile(networkStatePath())
+
+  let
+    isLocked = isLockedNetworkStateFile(networkStatePath())
+    currentNetworkStatePath = if isLocked: lockedNetworkStatePath()
+                              else: networkStatePath()
+
+  var network = initNicoruNetwork(currentNetworkStatePath)
 
   network.bridges[network.currentBridgeIndex].addNewNetworkInterface(
     containerId,
@@ -348,7 +358,8 @@ proc execContainer*(settings: RuntimeSettings,
     baseBrVethName(),
     isBridgeMode)
 
-  network.updateNetworkState(networkStatePath())
+  network.updateNetworkState(currentNetworkStatePath)
+  unlockNetworkStatefile(networkStatePath())
 
   let
     bridge = network.bridges[network.currentBridgeIndex]

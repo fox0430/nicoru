@@ -33,8 +33,11 @@ type
     bridges*: seq[Bridge]
     currentBridgeIndex*: int
 
-proc networkStatePath*(): string =
+proc networkStatePath*(): string {.inline.} =
   return "/var/run/nicoru/network_state.json"
+
+proc lockedNetworkStatePath*(): string {.inline.} =
+  return "/var/run/nicoru/network_state.json.lock"
 
 proc baseVethName*(): string {.inline.} =
   return "veth"
@@ -598,6 +601,17 @@ proc removeContainerIptablesRule*(iface: NetworkInterface,
 
       cmd = fmt"iptables -t nat -D POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
 
+proc lockNetworkStatefile*(networkStatePath: string) {.inline.} =
+  if fileExists(networkStatePath):
+    moveFile(networkStatePath, lockedNetworkStatePath())
+
+proc unlockNetworkStatefile*(networkStatePath: string) {.inline.} =
+  if fileExists(lockedNetworkStatePath()):
+    moveFile(lockedNetworkStatePath(), networkStatePath)
+
+proc isLockedNetworkStateFile*(networkStatePath: string): bool {.inline.} =
+  fileExists(lockedNetworkStatePath())
+
 proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
   # Up loopback interface
   block:
@@ -614,10 +628,10 @@ proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
 
   setDefaultGateWay(rtVethIpAddr)
 
-proc initNicoruNetwork*(): Network =
+proc initNicoruNetwork*(networkStatePath: string): Network =
   const BRIDGE_NAME = defaultBridgeName()
 
-  result = loadNetworkState(networkStatePath())
+  result = loadNetworkState(networkStatePath)
 
   if result.bridges.len == 0:
     result.bridges.add initBridge(BRIDGE_NAME)
