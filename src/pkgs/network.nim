@@ -32,6 +32,8 @@ type
   Network* = object
     bridges*: seq[Bridge]
     currentBridgeIndex*: int
+    # Default (Preferred) network interface on host
+    defautHostNic*: Option[NetworkInterface]
 
 proc networkStatePath*(): string {.inline.} =
   return "/var/run/nicoru/network_state.json"
@@ -94,7 +96,20 @@ proc getActualInterfaceName(interfaceName: string): string =
         try: result = splited[1].splitWhitespace[0]
         except: exception(fmt"Failed to get actual interface name. Invalid value: '{splited}'")
 
-proc getDefaultNetworkInterface*(): string =
+proc getPrimaryIpOfHost(): IpAddr =
+  let
+    # TODO: This method is not certain. Need fix it.
+    cmd = "hostname --ip-address"
+    r = execCmdEx(cmd)
+
+  if r.exitCode != 0:
+    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
+
+  let splited = r.output.split(" ")
+  return IpAddr(address: splited[0].replace("\n", ""))
+
+# Get NetworkInterface of a default (preferred) network interface on host
+proc getDefaultNetworkInterface(): Option[NetworkInterface] =
   let
     cmd = "ip route"
     r = execCmdEx(cmd)
@@ -102,12 +117,20 @@ proc getDefaultNetworkInterface*(): string =
   if r.exitCode != 0 or r.output.len == 0:
     exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
 
+  var interfaceName = ""
+
   for l in r.output.split('\n'):
-    let splited = l.splitWhitespace
+    let splited = l.split(" ")
     if splited[0] == "default":
       for index, word in splited:
         if "dev" == word:
-          return splited[index + 1]
+          interfaceName = splited[index + 1]
+
+  if interfaceName.len > 0:
+    let
+      ipAddr = getPrimaryIpOfHost()
+      iface = NetworkInterface(name: interfaceName, ipAddr: some(ipAddr))
+    return some(iface)
 
 proc getRtVethIpAddr*(bridge: Bridge): IpAddr {.inline.} =
   return bridge.rtVeth.get.ipAddr.get
@@ -132,18 +155,6 @@ proc bridgeExists*(bridgeName: string): bool =
 
 proc getVethIpAddr*(iface: VethPair): IpAddr {.inline.} =
   return iface.veth.get.ipAddr.get
-
-proc getPrimaryIpOfHost(): IpAddr =
-  let
-    # TODO: This method is not certain. Need fix it.
-    cmd = "hostname --ip-address"
-    r = execCmdEx(cmd)
-
-  if r.exitCode != 0:
-    exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
-
-  let splited = r.output.split(" ")
-  return IpAddr(address: splited[0].replace("\n", ""))
 
 proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
   for bridge in bridges:
@@ -260,6 +271,10 @@ proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     result.bridges.add toBridge(b)
 
+  if json["defautHostNic"]["has"].getBool:
+    let iface = toVeth(json["defautHostNic"]["val"])
+    result.defautHostNic = some(iface)
+
 proc getVethName*(iface: VethPair): Option[string] =
   if iface.veth.isSome:
     return some(iface.veth.get.name)
@@ -286,7 +301,7 @@ proc loadNetworkState*(networkStatePath: string): Network =
       return json.toNetwork
     except: exception(fmt"Failed to parse network_state.json. Please check {networkStatePath}")
   else:
-    return Network(bridges: @[])
+    return Network(bridges: @[], defautHostNic: getDefaultNetworkInterface())
 
 proc getCurrentBridgeIndex*(
   bridges: seq[Bridge], bridgeName: string): Option[int] =
@@ -517,8 +532,10 @@ proc iptablesRuleExist(rule: string): bool =
   if r.output == "0\n":
     return true
 
-proc setNat*(interfaceName: string, ipAddr: IpAddr) =
-  let cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
+proc setNat*(iface: NetworkInterface, ipAddr: IpAddr) =
+  let
+    interfaceName = iface.name
+    cmd = fmt"iptables -t nat -A POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
 
   if not iptablesRuleExist(cmd):
     let r = execShellCmd(cmd)
@@ -534,34 +551,36 @@ proc setDefaultGateWay(ipAddr: IpAddr) =
   if r != 0:
     exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-proc setPortForward*(vethIpAddr: IpAddr, portPair: PublishPortPair) =
-  let
-    hPort = portPair.host
-    cPort = portPair.container
+proc setPortForward*(vethIpAddr: IpAddr,
+                     portPair: PublishPortPair,
+                     defautHostNic: NetworkInterface) =
 
-    # TODO: Remove
-    hostAddress = getPrimaryIpOfHost()
+  if defautHostNic.ipAddr.isSome:
+    let
+      hPort = portPair.host
+      cPort = portPair.container
 
-    containerAddress = vethIpAddr.address
+      hostAddress = defautHostNic.ipAddr.get
+      containerAddress = vethIpAddr.address
 
-  # External traffic
-  block:
-    let cmd = fmt"iptables -t nat -A PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+    # External traffic
+    block:
+      let cmd = fmt"iptables -t nat -A PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
 
-    if not iptablesRuleExist(cmd):
-      let r = execShellCmd(cmd)
-      if r != 0:
-        exception(fmt"Failed to '{cmd}': exitCode {r}")
+      if not iptablesRuleExist(cmd):
+        let r = execShellCmd(cmd)
+        if r != 0:
+          exception(fmt"Failed to '{cmd}': exitCode {r}")
 
-  # Local traffic
-  block:
-    let cmd = fmt "iptables -t nat -A OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+    # Local traffic
+    block:
+      let cmd = fmt "iptables -t nat -A OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
 
-    if not iptablesRuleExist(cmd):
-      let r = execShellCmd(cmd)
+      if not iptablesRuleExist(cmd):
+        let r = execShellCmd(cmd)
 
-      if r != 0:
-        exception(fmt"Failed to '{cmd}': exitCode {r}")
+        if r != 0:
+          exception(fmt"Failed to '{cmd}': exitCode {r}")
 
 proc removeIptablesRule(rule: string) =
   if rule.contains(" -A "):
@@ -573,35 +592,35 @@ proc removeIptablesRule(rule: string) =
     exception(fmt"Invalid iptables rule: '{rule}'")
 
 proc removeContainerIptablesRule*(vethPair: VethPair,
-                                  portPair: PublishPortPair) =
+                                  portPair: PublishPortPair,
+                                  defautHostNic: NetworkInterface) =
 
-  let
-    veth = vethPair.veth.get
-
-    # TODO: Remove
-    hostAddress = getPrimaryIpOfHost()
-
-    containerAddress = veth.ipAddr.get.address
-
-    hPort = portPair.host
-    cPort = portPair.container
-
-  block:
-    let cmd = fmt"iptables -t nat -D PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
-    discard execShellCmd(cmd)
-
-  block:
-    let cmd = fmt "iptables -t nat -D OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
-    discard execShellCmd(cmd)
-
-  block:
+  if defautHostNic.ipAddr.isSome:
     let
-      # TODO: Remove
-      ipAddr = defaultNatAddress()
-      # TODO: Remove
-      interfaceName = getDefaultNetworkInterface()
+      veth = vethPair.veth.get
 
-      cmd = fmt"iptables -t nat -D POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
+      hostAddress = defautHostNic.ipAddr.get
+      containerAddress = veth.ipAddr.get.address
+
+      hPort = portPair.host
+      cPort = portPair.container
+
+    block:
+      let cmd = fmt"iptables -t nat -D PREROUTING -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+      discard execShellCmd(cmd)
+
+    block:
+      let cmd = fmt "iptables -t nat -D OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+      discard execShellCmd(cmd)
+
+    block:
+      let
+        # TODO: Remove
+        ipAddr = defaultNatAddress()
+        interfaceName = defautHostNic.name
+
+        cmd = fmt"iptables -t nat -D POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
+      discard execShellCmd(cmd)
 
 proc lockNetworkStatefile*(networkStatePath: string) {.inline.} =
   if fileExists(networkStatePath):
@@ -634,6 +653,9 @@ proc initNicoruNetwork*(networkStatePath: string): Network =
   const BRIDGE_NAME = defaultBridgeName()
 
   result = loadNetworkState(networkStatePath)
+
+  if result.defautHostNic.isNone:
+    result.defautHostNic = getDefaultNetworkInterface()
 
   if result.bridges.len == 0:
     result.bridges.add initBridge(BRIDGE_NAME)

@@ -296,11 +296,15 @@ proc exitContainer(config: var ContainerConfig,
   config.updateContainerConfigJson(configPath)
 
   if NetworkMode.bridge == settings.networkMode and
-     settings.publishPort.isSome:
+     settings.publishPort.isSome and
+     network.defautHostNic.isSome:
+
     let
       bridge = network.bridges.getBridge(bridgeName)
-      iface = bridge.getVethPair(config.containerId)
-    removeContainerIptablesRule(iface, settings.publishPort.get)
+      vethPair = bridge.getVethPair(config.containerId)
+    removeContainerIptablesRule(vethPair,
+                                settings.publishPort.get,
+                                network.defautHostNic.get)
 
   network.removeIpFromNetworkInterface(bridgeName, config.containerId)
   network.updateNetworkState(networkStatePath())
@@ -372,13 +376,15 @@ proc execContainer*(settings: RuntimeSettings,
       createBridge(network.bridges[^1])
 
   if isBridgeMode:
-    let defaultInterface = getDefaultNetworkInterface()
-    setNat(defaultInterface, defaultNatAddress())
+    if network.defautHostNic.isSome:
+      setNat(network.defautHostNic.get, defaultNatAddress())
 
     createVethPair(iface.getBrVethName.get, iface.getVethName.get)
 
-    if settings.publishPort.isSome:
-      setPortForward(iface.getVethIpAddr, settings.publishPort.get)
+    if settings.publishPort.isSome and network.defautHostNic.isSome:
+      setPortForward(iface.getVethIpAddr,
+                     settings.publishPort.get,
+                     network.defautHostNic.get)
 
   let
     imageId = config.imageId
