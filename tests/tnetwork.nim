@@ -139,3 +139,15 @@ suite "IpAddr type":
 
   test "to string 2":
     check "10.0.0.0/24" == $IpAddr(address: "10.0.0.0", subnetMask: some(24))
+
+  test "isIpAddr 1":
+    check isIpAddr("10.0.0.0")
+
+  test "isIpAddr 2":
+    check isIpAddr("10.0.0.0/24")
+
+  test "isIpAddr 3":
+    check not isIpAddr("10.0.0.")
+
+  test "isIpAddr 4":
+    check not isIpAddr("10.0.0./24")
