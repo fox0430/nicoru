@@ -8,24 +8,24 @@ type
     address: string
     subnetMask: Option[int]
 
-  Veth = object
+  NetworkInterface = object
     name: string
     ipAddr: Option[IpAddr]
 
   VethPair* = object
     containerId: string
     # Created inside a container
-    veth: Option[Veth]
+    veth: Option[NetworkInterface]
     # Connect a bridge with veth (Doesn't have a IP Address)
-    brVeth: Option[Veth]
+    brVeth: Option[NetworkInterface]
 
   Bridge* = object
     # Bridge name
     name*: string
     # Connet to default NIC
-    rtVeth: Option[Veth]
+    rtVeth: Option[NetworkInterface]
     # Connect a bridge with rtVeth (Doesn't have a IP Address)
-    brRtVeth: Option[Veth]
+    brRtVeth: Option[NetworkInterface]
     # veths for a container
     vethPairs*: seq[VethPair]
 
@@ -192,11 +192,11 @@ proc `$`(ipAddr: IpAddr): string =
   if ipAddr.subnetMask.isSome:
     result &= "/" & $ipAddr.subnetMask.get
 
-proc initVeth(name: string, ipAddr: IpAddr): Veth =
-  return Veth(name: name, ipAddr: some(ipAddr))
+proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface =
+  return NetworkInterface(name: name, ipAddr: some(ipAddr))
 
 proc initVethPair(containerId: string,
-                  veth, brVeth: Veth): VethPair =
+                  veth, brVeth: NetworkInterface): VethPair =
 
   return VethPair(containerId: containerId,
                   veth: some(veth),
@@ -205,8 +205,9 @@ proc initVethPair(containerId: string,
 proc initBridge*(bridgeName: string): Bridge =
   let
     rtVethIpAddr = some(defaultBridgeIpAddr())
-    rtVeth = Veth(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
-    brRtVeth = Veth(name: defaultRtRtBridgeVethName())
+    rtVeth = NetworkInterface(name: defaultRtBridgeVethName(),
+                              ipAddr: rtVethIpAddr)
+    brRtVeth = NetworkInterface(name: defaultRtRtBridgeVethName())
 
   return Bridge(name: bridgeName,
                 rtVeth: some(rtVeth),
@@ -220,7 +221,7 @@ proc toIpAddr(json: JsonNode): IpAddr =
     let subnetMask = json["subnetMask"]["val"].getInt
     result.subnetMask = some(subnetMask)
 
-proc toVeth(json: JsonNode): Veth =
+proc toVeth(json: JsonNode): NetworkInterface =
   result.name = json["name"].getStr
 
   if json["ipAddr"]["has"].getBool:
@@ -348,17 +349,17 @@ proc addNewNetworkInterface*(bridge: var Bridge,
         vethName = newVethName(bridge.vethPairs, baseVethName)
         ipAddr = IpAddr(address: newVethIpAddr(bridge.vethPairs),
                         subnetMask: some(24))
-        veth = Veth(name: vethName, ipAddr: some(ipAddr))
+        veth = NetworkInterface(name: vethName, ipAddr: some(ipAddr))
       vethPair.veth = some(veth)
 
     block:
       let
         brVethName = newBrVethName(bridge.vethPairs, baseBrVethName)
-        brVeth = Veth(name: brVethName, ipAddr: none(IpAddr))
+        brVeth = NetworkInterface(name: brVethName, ipAddr: none(IpAddr))
       vethPair.brVeth = some(brVeth)
   else:
-    vethPair.veth = none(Veth)
-    vethPair.brVeth = none(Veth)
+    vethPair.veth = none(NetworkInterface)
+    vethPair.brVeth = none(NetworkInterface)
 
   bridge.vethPairs.add vethPair
 
@@ -422,7 +423,7 @@ proc createVethPair*(hostInterfaceName, containerInterfaceName: string) =
   if r != 0 and r != 2:
     exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
-proc addIpAddrToVeth*(veth: Veth) =
+proc addIpAddrToVeth*(veth: NetworkInterface) =
   let
     ipAddr = veth.ipAddr.get
     interfaceName = veth.name
