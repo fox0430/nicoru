@@ -11,8 +11,8 @@ suite "Update network_state.json":
       containerId = $genOid()
 
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
-      veth = Veth(name: "veth", ipAddr: some(vethIpAddr))
-      brVeth = Veth(name: "brVeth", ipAddr: none(IpAddr))
+      veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
+      brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
       vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
@@ -50,13 +50,13 @@ suite "Update network_state.json":
     let
       # TODO: Fix
       containerId = $genOid()
-      veth = Veth(name: "veth0", ipAddr: some(IpAddr(address: "10.0.0.2", subnetMask: some(24))))
-      brVeth = Veth(name: "brVeth0", ipAddr: none(IpAddr))
+      veth = NetworkInterface(name: "veth0", ipAddr: some(IpAddr(address: "10.0.0.2", subnetMask: some(24))))
+      brVeth = NetworkInterface(name: "brVeth0", ipAddr: none(IpAddr))
       vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       rtVethIpAddr = some(defaultBridgeIpAddr())
-      rtVeth = Veth(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
-      brRtVeth = Veth(name: defaultRtRtBridgeVethName())
+      rtVeth = NetworkInterface(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
+      brRtVeth = NetworkInterface(name: defaultRtRtBridgeVethName())
 
       bridgeName = defaultBridgeName()
       bridge = Bridge(name: bridgeName,
@@ -115,8 +115,8 @@ suite "Network object":
       containerId = $genOid()
 
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
-      veth = Veth(name: "veth", ipAddr: some(vethIpAddr))
-      brVeth = Veth(name: "brVeth", ipAddr: none(IpAddr))
+      veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
+      brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
       vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
