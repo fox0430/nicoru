@@ -62,6 +62,38 @@ proc defaultRtRtBridgeVethName*(): string {.inline.} =
 proc defaultNatAddress*(): IpAddr {.inline.} =
   return IpAddr(address: "10.0.0.0", subnetMask: some(24))
 
+# TODO: Move
+proc isDigit*(str: string): bool =
+  for c in str:
+    if not isDigit(c): return false
+  return true
+
+# Only address
+proc isIpAddress(str: string): bool =
+  if str.count('.') == 3:
+    for s in str.split('.'):
+      if (not s.len > 0 and s.len < 4) or (not isDigit(s)):
+        return false
+    return true
+
+# Include a net mask
+proc isIpAddr(str: string): bool =
+  if str.contains('/'):
+    let splited = str.split('/')
+    return splited.len == 2 and isIpAddress(splited[0]) and isDigit(splited[1])
+  else:
+    return isIpAddress(str)
+
+proc parseIpAdder*(str: string): IpAddr =
+  let splited = str.split("/")
+
+  if splited.len == 1:
+    return IpAddr(address: splited[0], subnetMask: none(int))
+  elif splited.len == 2:
+      return IpAddr(address: splited[0], subnetMask: some(parseInt(splited[1])))
+  else:
+    exception(fmt"Failed to parseIpAdder: '{str}'")
+
 proc getAllInterfaceName(): seq[string] =
   let
     cmd = "ip a"
@@ -96,17 +128,20 @@ proc getActualInterfaceName(interfaceName: string): string =
         try: result = splited[1].splitWhitespace[0]
         except: exception(fmt"Failed to get actual interface name. Invalid value: '{splited}'")
 
-proc getPrimaryIpOfHost(): IpAddr =
+proc getPrimaryIpOfHost(defautInterfaceName: string): IpAddr =
   let
-    # TODO: This method is not certain. Need fix it.
-    cmd = "hostname --ip-address"
+    cmd = fmt"ip addr show dev {defautInterfaceName}"
     r = execCmdEx(cmd)
 
   if r.exitCode != 0:
     exception(fmt"Failed to '{cmd}': exitCode: {r.exitCode}")
 
-  let splited = r.output.split(" ")
-  return IpAddr(address: splited[0].replace("\n", ""))
+  for l in r.output.split("\n"):
+    if l.split(" ").contains("inet"):
+      let splited = l.split(" ")
+      for i, e in splited:
+        if e == "inet" and splited.high > i and isIpAddr(splited[i + 1]):
+          return IpAddr(parseIpAdder(splited[i + 1]))
 
 # Get NetworkInterface of a default (preferred) network interface on host
 proc getDefaultNetworkInterface(): Option[NetworkInterface] =
@@ -128,7 +163,7 @@ proc getDefaultNetworkInterface(): Option[NetworkInterface] =
 
   if interfaceName.len > 0:
     let
-      ipAddr = getPrimaryIpOfHost()
+      ipAddr = getPrimaryIpOfHost(interfaceName)
       iface = NetworkInterface(name: interfaceName, ipAddr: some(ipAddr))
     return some(iface)
 
@@ -171,32 +206,6 @@ proc getVethPair*(bridge: Bridge,
       return vethPair
 
   exception(fmt"NetworkInterface object not found: '{containerId}'")
-
-# TODO: Move
-proc isDigit*(str: string): bool =
-  for c in str:
-    if not isDigit(c): return false
-  return true
-
-proc ipAddressValidate(str: string): bool =
-  let splited = str.split('.')
-  if splited.len == 4:
-    for str in splited:
-      if not isDigit(str): return false
-    return true
-
-proc parseIpAdder*(str: string): IpAddr =
-  let splited = str.split("/")
-
-  if splited.len == 1 and ipAddressValidate(splited[0]):
-    return IpAddr(address: splited[0], subnetMask: none(int))
-  elif splited.len == 2:
-    if ipAddressValidate(splited[0]) and isDigit(splited[1]):
-      return IpAddr(address: splited[0], subnetMask: some(parseInt(splited[1])))
-    else:
-      exception(fmt"Failed to parseIpAdder: '{str}'")
-  else:
-    exception(fmt"Failed to parseIpAdder: '{str}'")
 
 proc `$`(ipAddr: IpAddr): string =
   result = ipAddr.address
@@ -610,7 +619,7 @@ proc removeContainerIptablesRule*(vethPair: VethPair,
       discard execShellCmd(cmd)
 
     block:
-      let cmd = fmt "iptables -t nat -D OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
+      let cmd = fmt"iptables -t nat -D OUTPUT -d {hostAddress} -p tcp -m tcp --dport {hPort} -j DNAT --to-destination {containerAddress}:{cPort}"
       discard execShellCmd(cmd)
 
     block:
