@@ -12,7 +12,7 @@ type
     name: string
     ipAddr: Option[IpAddr]
 
-  NetworkInterface* = object
+  VethPair* = object
     containerId: string
     # Created inside a container
     veth: Option[Veth]
@@ -27,7 +27,7 @@ type
     # Connect a bridge with rtVeth (Doesn't have a IP Address)
     brRtVeth: Option[Veth]
     # veths for a container
-    ifaces*: seq[NetworkInterface]
+    vethPairs*: seq[VethPair]
 
   Network* = object
     bridges*: seq[Bridge]
@@ -130,7 +130,7 @@ proc bridgeExists*(bridgeName: string): bool =
       if interfaceName == bridgeName:
         return true
 
-proc getVethIpAddr*(iface: NetworkInterface): IpAddr {.inline.} =
+proc getVethIpAddr*(iface: VethPair): IpAddr {.inline.} =
   return iface.veth.get.ipAddr.get
 
 proc getPrimaryIpOfHost(): IpAddr =
@@ -152,12 +152,12 @@ proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
 
   exception(fmt"Bridge object not found: '{bridgeName}'")
 
-proc getNetworkInterface*(bridge: Bridge,
-                          containerId: string): NetworkInterface =
+proc getVethPair*(bridge: Bridge,
+                          containerId: string): VethPair =
 
-  for iface in bridge.ifaces:
-    if iface.containerId == containerId:
-      return iface
+  for vethPair in bridge.vethPairs:
+    if vethPair.containerId == containerId:
+      return vethPair
 
   exception(fmt"NetworkInterface object not found: '{containerId}'")
 
@@ -195,12 +195,12 @@ proc `$`(ipAddr: IpAddr): string =
 proc initVeth(name: string, ipAddr: IpAddr): Veth =
   return Veth(name: name, ipAddr: some(ipAddr))
 
-proc initNetworkInterface(containerId: string,
-                          veth, brVeth: Veth): NetworkInterface =
+proc initVethPair(containerId: string,
+                  veth, brVeth: Veth): VethPair =
 
-  return NetworkInterface(containerId: containerId,
-                          veth: some(veth),
-                          brVeth: some(brVeth))
+  return VethPair(containerId: containerId,
+                  veth: some(veth),
+                  brVeth: some(brVeth))
 
 proc initBridge*(bridgeName: string): Bridge =
   let
@@ -211,7 +211,7 @@ proc initBridge*(bridgeName: string): Bridge =
   return Bridge(name: bridgeName,
                 rtVeth: some(rtVeth),
                 brRtVeth: some(brRtVeth),
-                ifaces: @[])
+                vethPairs: @[])
 
 proc toIpAddr(json: JsonNode): IpAddr =
   result.address = json["address"].getStr
@@ -227,7 +227,7 @@ proc toVeth(json: JsonNode): Veth =
     let ipAddr = toIpAddr(json["ipAddr"]["val"])
     result.ipAddr = some(ipAddr)
 
-proc toNetworkInterface(json: JsonNode): NetworkInterface =
+proc toVethPair(json: JsonNode): VethPair =
   let containerId = json["containerId"].getStr
 
   result.containerId = containerId
@@ -251,19 +251,19 @@ proc toBridge(json: JsonNode): Bridge =
     let brRtVeth = toVeth(json["brRtVeth"]["val"])
     result.brRtVeth = some(brRtVeth)
 
-  if json["ifaces"].len > 0:
-    for ifaceJson in json["ifaces"].items:
-      result.ifaces.add toNetworkInterface(ifaceJson)
+  if json["vethPairs"].len > 0:
+    for ifaceJson in json["vethPairs"].items:
+      result.vethPairs.add toVethPair(ifaceJson)
 
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     result.bridges.add toBridge(b)
 
-proc getVethName*(iface: NetworkInterface): Option[string] =
+proc getVethName*(iface: VethPair): Option[string] =
   if iface.veth.isSome:
     return some(iface.veth.get.name)
 
-proc getBrVethName*(iface: NetworkInterface): Option[string] =
+proc getBrVethName*(iface: VethPair): Option[string] =
   if iface.brVeth.isSome:
     return some(iface.brVeth.get.name)
 
@@ -294,18 +294,18 @@ proc getCurrentBridgeIndex*(
     if b.name == bridgeName:
       return some(index)
 
-proc newVethName(iface: seq[NetworkInterface], baseName: string): string =
+proc newVethName(vethPairs: seq[VethPair], baseName: string): string =
   var countVeth = 0
-  for i in iface:
-    if i.veth.isSome:
+  for v in vethPairs:
+    if v.veth.isSome:
       countVeth.inc
 
   return baseName & $countVeth
 
-proc newBrVethName(iface: seq[NetworkInterface], baseName: string): string =
+proc newBrVethName(vethPairs: seq[VethPair], baseName: string): string =
   var countBrVeth = 0
-  for i in iface:
-    if i.veth.isSome:
+  for v in vethPairs:
+    if v.veth.isSome:
       countBrVeth.inc
 
   return baseName & $countBrVeth
@@ -318,18 +318,18 @@ proc getRightEndNum(ipAddr: IpAddr): int =
   try: return numStr.parseInt
   except: exception(fmt"Failed to parse int: '{numStr}'")
 
-proc newVethIpAddr(iface: seq[NetworkInterface]): string =
+proc newVethIpAddr(vethPairs: seq[VethPair]): string =
   var maxNum = 1
-  for ip in iface:
-    if ip.veth.isSome and ip.veth.get.ipAddr.isSome:
+  for v in vethPairs:
+    if v.veth.isSome and v.veth.get.ipAddr.isSome:
       let
-        num = getRightEndNum(ip.veth.get.ipAddr.get)
+        num = getRightEndNum(v.veth.get.ipAddr.get)
       if num > maxNum:
         maxNum = num
 
-    if ip.brVeth.isSome and ip.brVeth.get.ipAddr.isSome:
+    if v.brVeth.isSome and v.brVeth.get.ipAddr.isSome:
       let
-        num = getRightEndNum(ip.brVeth.get.ipAddr.get)
+        num = getRightEndNum(v.brVeth.get.ipAddr.get)
       if num > maxNum:
         maxNum = num
 
@@ -340,29 +340,30 @@ proc addNewNetworkInterface*(bridge: var Bridge,
                              containerId, baseVethName, baseBrVethName: string,
                              isBridgeMode: bool) =
 
-  var iface = NetworkInterface(containerId: containerId)
+  var vethPair = VethPair(containerId: containerId)
 
   if isBridgeMode:
     block:
       let
-        vethName = newVethName(bridge.ifaces, baseVethName)
-        ipAddr = IpAddr(address: newVethIpAddr(bridge.ifaces), subnetMask: some(24))
+        vethName = newVethName(bridge.vethPairs, baseVethName)
+        ipAddr = IpAddr(address: newVethIpAddr(bridge.vethPairs),
+                        subnetMask: some(24))
         veth = Veth(name: vethName, ipAddr: some(ipAddr))
-      iface.veth = some(veth)
+      vethPair.veth = some(veth)
 
     block:
       let
-        brVethName = newBrVethName(bridge.ifaces, baseBrVethName)
+        brVethName = newBrVethName(bridge.vethPairs, baseBrVethName)
         brVeth = Veth(name: brVethName, ipAddr: none(IpAddr))
-      iface.brVeth = some(brVeth)
+      vethPair.brVeth = some(brVeth)
   else:
-    iface.veth = none(Veth)
-    iface.brVeth = none(Veth)
+    vethPair.veth = none(Veth)
+    vethPair.brVeth = none(Veth)
 
-  bridge.ifaces.add iface
+  bridge.vethPairs.add vethPair
 
-proc add*(bridge: var Bridge, iface: NetworkInterface) =
-  bridge.ifaces.add(iface)
+proc add*(bridge: var Bridge, vethPair: VethPair) =
+  bridge.vethPairs.add vethPair
 
 proc addIpToNetworkInterface(containerId, ipAddr: string) =
   const filePath = networkStatePath()
@@ -392,9 +393,9 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
 proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:
-      for ifaceIndex, iface in b.ifaces:
-        if iface.containerId == containerId:
-          network.bridges[bridgeIndex].ifaces.delete(ifaceIndex .. ifaceIndex)
+      for ifaceIndex, vethPair in b.vethPairs:
+        if vethPair.containerId == containerId:
+          network.bridges[bridgeIndex].vethPairs.delete(ifaceIndex .. ifaceIndex)
           return
 
 proc checkIfExistNetworkInterface(interfaceName: string): bool =
@@ -441,10 +442,10 @@ proc waitInterfaceReady*(interfaceName: string) =
   else:
     exception("Failed to ip command in container")
 
-proc addInterfaceToContainer*(iface: NetworkInterface, pid: Pid) =
+proc addInterfaceToContainer*(vethPair: VethPair, pid: Pid) =
   block:
     let
-      containerInterfaceName = iface.veth.get.name
+      containerInterfaceName = vethPair.veth.get.name
       cmd = fmt"ip link set {containerInterfaceName} netns {$pid}"
       r = execShellCmd(cmd)
 
@@ -452,7 +453,7 @@ proc addInterfaceToContainer*(iface: NetworkInterface, pid: Pid) =
       exception(fmt"Failed to '{cmd}': exitCode: {r}")
 
   block:
-    let hostInterfaceName = iface.brVeth.get.name
+    let hostInterfaceName = vethPair.brVeth.get.name
     upNetworkInterface(hostInterfaceName)
 
 proc connectVethToBridge*(interfaceName, bridgeName: string) =
@@ -570,11 +571,11 @@ proc removeIptablesRule(rule: string) =
   else:
     exception(fmt"Invalid iptables rule: '{rule}'")
 
-proc removeContainerIptablesRule*(iface: NetworkInterface,
+proc removeContainerIptablesRule*(vethPair: VethPair,
                                   portPair: PublishPortPair) =
 
   let
-    veth = iface.veth.get
+    veth = vethPair.veth.get
 
     # TODO: Remove
     hostAddress = getPrimaryIpOfHost()
@@ -612,18 +613,18 @@ proc unlockNetworkStatefile*(networkStatePath: string) {.inline.} =
 proc isLockedNetworkStateFile*(networkStatePath: string): bool {.inline.} =
   fileExists(lockedNetworkStatePath())
 
-proc initContainerNetwork*(iface: NetworkInterface, rtVethIpAddr: IpAddr) =
+proc initContainerNetwork*(vethPair: VethPair, rtVethIpAddr: IpAddr) =
   # Up loopback interface
   block:
     const LOOPBACK_INTERFACE= "lo"
     upNetworkInterface(LOOPBACK_INTERFACE)
 
   # Wait for a network interface to be ready.
-  let vethName = iface.getVethName.get
+  let vethName = vethPair.getVethName.get
 
   waitInterfaceReady(vethName)
 
-  addIpAddrToVeth(iface.veth.get)
+  addIpAddrToVeth(vethPair.veth.get)
   upNetworkInterface(vethName)
 
   setDefaultGateWay(rtVethIpAddr)

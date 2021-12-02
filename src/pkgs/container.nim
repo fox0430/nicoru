@@ -299,7 +299,7 @@ proc exitContainer(config: var ContainerConfig,
      settings.publishPort.isSome:
     let
       bridge = network.bridges.getBridge(bridgeName)
-      iface = bridge.getNetworkInterface(config.containerId)
+      iface = bridge.getVethPair(config.containerId)
     removeContainerIptablesRule(iface, settings.publishPort.get)
 
   network.removeIpFromNetworkInterface(bridgeName, config.containerId)
@@ -364,7 +364,7 @@ proc execContainer*(settings: RuntimeSettings,
   let
     bridge = network.bridges[network.currentBridgeIndex]
     bridgeName = bridge.name
-    iface = bridge.ifaces[^1]
+    iface = bridge.vethPairs[^1]
 
   # Create a user defined bridge
   if defaultBridgeName() != bridge.name:
