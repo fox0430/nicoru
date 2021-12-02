@@ -70,9 +70,10 @@ proc isDigit*(str: string): bool =
 
 # Only address
 proc isIpAddress(str: string): bool =
-  if str.count('.') == 3:
-    for s in str.split('.'):
-      if (not s.len > 0 and s.len < 4) or (not isDigit(s)):
+  let splited = str.split('.')
+  if splited.len == 4:
+    for s in splited:
+      if (not (s.len > 0 and s.len < 4)) or (not isDigit(s)):
         return false
     return true
 
