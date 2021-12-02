@@ -189,8 +189,8 @@ proc bridgeExists*(bridgeName: string): bool =
       if interfaceName == bridgeName:
         return true
 
-proc getVethIpAddr*(iface: VethPair): IpAddr {.inline.} =
-  return iface.veth.get.ipAddr.get
+proc getVethIpAddr*(vethPair: VethPair): IpAddr {.inline.} =
+  return vethPair.veth.get.ipAddr.get
 
 proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
   for bridge in bridges:
@@ -242,7 +242,7 @@ proc toIpAddr(json: JsonNode): IpAddr =
     let subnetMask = json["subnetMask"]["val"].getInt
     result.subnetMask = some(subnetMask)
 
-proc toVeth(json: JsonNode): NetworkInterface =
+proc toNetworkInterface(json: JsonNode): NetworkInterface =
   result.name = json["name"].getStr
 
   if json["ipAddr"]["has"].getBool:
@@ -255,43 +255,43 @@ proc toVethPair(json: JsonNode): VethPair =
   result.containerId = containerId
 
   if json["veth"]["has"].getBool:
-    let veth = toVeth(json["veth"]["val"])
+    let veth = toNetworkInterface(json["veth"]["val"])
     result.veth = some(veth)
 
   if json["brVeth"]["has"].getBool:
-    let brVeth = toVeth(json["brVeth"]["val"])
+    let brVeth = toNetworkInterface(json["brVeth"]["val"])
     result.brVeth = some(brVeth)
 
 proc toBridge(json: JsonNode): Bridge =
   result.name = json["name"].getStr
 
   if json["rtVeth"]["has"].getBool:
-    let rtVeth = toVeth(json["rtVeth"]["val"])
+    let rtVeth = toNetworkInterface(json["rtVeth"]["val"])
     result.rtVeth = some(rtVeth)
 
   if json["brRtVeth"]["has"].getBool:
-    let brRtVeth = toVeth(json["brRtVeth"]["val"])
+    let brRtVeth = toNetworkInterface(json["brRtVeth"]["val"])
     result.brRtVeth = some(brRtVeth)
 
   if json["vethPairs"].len > 0:
-    for ifaceJson in json["vethPairs"].items:
-      result.vethPairs.add toVethPair(ifaceJson)
+    for vethPairJson in json["vethPairs"].items:
+      result.vethPairs.add toVethPair(vethPairJson)
 
 proc toNetwork(json: JsonNode): Network =
   for b in json["bridges"]:
     result.bridges.add toBridge(b)
 
   if json["defautHostNic"]["has"].getBool:
-    let iface = toVeth(json["defautHostNic"]["val"])
+    let iface = toNetworkInterface(json["defautHostNic"]["val"])
     result.defautHostNic = some(iface)
 
-proc getVethName*(iface: VethPair): Option[string] =
-  if iface.veth.isSome:
-    return some(iface.veth.get.name)
+proc getVethName*(vethPair: VethPair): Option[string] =
+  if vethPair.veth.isSome:
+    return some(vethPair.veth.get.name)
 
-proc getBrVethName*(iface: VethPair): Option[string] =
-  if iface.brVeth.isSome:
-    return some(iface.brVeth.get.name)
+proc getBrVethName*(vethPair: VethPair): Option[string] =
+  if vethPair.brVeth.isSome:
+    return some(vethPair.brVeth.get.name)
 
 # Write/Overwrite a network_state.json
 proc updateNetworkState*(network: Network, networkStatePath: string) =
