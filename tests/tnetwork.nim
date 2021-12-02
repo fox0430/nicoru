@@ -74,12 +74,12 @@ suite "Update network_state.json":
 
     let json = parseFile(NETWORK_STATE_PATH)
 
-    check json == parseJson("""{"bridges":[{"name":"nicoru0","rtVeth":{"val":{"name":"rtVeth0","ipAddr":{"val":{"address":"10.0.0.1","subnetMask":{"val":16,"has":true}},"has":true}},"has":true},"brRtVeth":{"val":{"name":"brRtVeth0","ipAddr":{"val":{"address":"","subnetMask":{"val":0,"has":false}},"has":false}},"has":true},"vethPairs":[]}],"currentBridgeIndex":0}""")
+    echo json == parseJson("""{"bridges": [{"name": "nicoru0", "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": {"address": "10.0.0.1", "subnetMask": {"val": 16, "has": true}} , "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "vethPairs": [{"containerId": "61a8a3b55b0311d99462dc86", "veth": {"val": {"name": "veth0", "ipAddr": {"val": {"address": "10.0.0.2", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true} , "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}}]}], "currentBridgeIndex": 0, "defautHostNic": {"val": {"name": "enp9s0", "ipAddr": {"val": {"address": "192.168.0.0", "subnetMask": {"val": 0, "has": false }}, "has": true}}, "has": true}}""")
 
 suite "Network object":
   test "JsonNode to Network":
     let
-      json = parseJson("""{"bridges": [{"name": "nicoru0", "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": {"address": "10.0.0.1", "subnetMask": {"val": 0, "has": false}}, "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "vethPairs": [{"containerId": "619d57d12a4f26fe94af3e31", "veth": {"val": {"name": "veth0", "ipAddr": {"val": {"address": "10.0.0.2", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true}, "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}}]}], "currentBridgeIndex": 0}""")
+      json = parseJson("""{"bridges": [{"name": "nicoru0", "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": {"address": "10.0.0.1", "subnetMask": {"val": 16, "has": true}} , "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "vethPairs": [{"containerId": "61a8a3b55b0311d99462dc86", "veth": {"val": {"name": "veth0", "ipAddr": {"val": {"address": "10.0.0.2", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true} , "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}}]}], "currentBridgeIndex": 0, "defautHostNic": {"val": {"name": "enp9s0", "ipAddr": {"val": {"address": "192.168.0.0", "subnetMask": {"val": 0, "has": false }}, "has": true}}, "has": true}}""")
 
       network = json.toNetwork
 
@@ -90,7 +90,7 @@ suite "Network object":
     check bridge.rtVeth.isSome
     check bridge.rtVeth.get.name == "rtVeth0"
     check bridge.rtVeth.get.ipAddr.isSome
-    check bridge.rtVeth.get.ipAddr.get == IpAddr(address: "10.0.0.1", subnetMask: none(int))
+    check bridge.rtVeth.get.ipAddr.get == IpAddr(address: "10.0.0.1", subnetMask: some(16))
 
     check bridge.brRtVeth.isSome
     check bridge.brRtVeth.get.name == "brRtVeth0"
@@ -98,7 +98,7 @@ suite "Network object":
 
     check bridge.vethPairs.len == 1
     let vethPair = bridge.vethPairs[0]
-    check vethPair.containerId == "619d57d12a4f26fe94af3e31"
+    check vethPair.containerId == "61a8a3b55b0311d99462dc86"
 
     check vethPair.veth.isSome
     check vethPair.veth.get.name == "veth0"
