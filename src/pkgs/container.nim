@@ -375,7 +375,6 @@ proc execContainer*(settings: RuntimeSettings,
   let
     bridge = network.bridges[network.currentBridgeIndex]
     bridgeName = bridge.name
-    vethPair = bridge.vethPairs[^1]
 
   # Create a user defined bridge
   if defaultBridgeName() != bridge.name:
@@ -385,6 +384,8 @@ proc execContainer*(settings: RuntimeSettings,
   if isBridgeMode:
     if network.defautHostNic.isSome:
       setNat(network.defautHostNic.get, bridge.natIpAddr.get)
+
+    let vethPair = bridge.vethPairs[^1]
 
     createVethPair(vethPair.getBrVethName.get, vethPair.getVethName.get)
 
@@ -414,7 +415,7 @@ proc execContainer*(settings: RuntimeSettings,
 
       # Set up container network
       if isBridgeMode:
-        vethPair.initContainerNetwork(bridge.getRtVethIpAddr)
+        bridge.vethPairs[^1].initContainerNetwork(bridge.getRtVethIpAddr)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -518,9 +519,9 @@ proc execContainer*(settings: RuntimeSettings,
 
     if isBridgeMode:
       # Add network interface
-      addInterfaceToContainer(vethPair, pid.toPid)
+      addInterfaceToContainer(bridge.vethPairs[^1], pid.toPid)
 
-      connectVethToBridge(vethPair.getBrVethName.get, bridgeName)
+      connectVethToBridge(bridge.vethPairs[^1].getBrVethName.get, bridgeName)
 
     # TODO: Delete
     var status: cint
