@@ -282,6 +282,10 @@ proc toNetworkInterface(json: JsonNode): NetworkInterface =
     let ipAddr = toIpAddr(json["ipAddr"]["val"])
     result.ipAddr = some(ipAddr)
 
+proc toPublishPortPair(json: JsonNode): PublishPortPair =
+  result.host = parsePort(json["host"].getInt)
+  result.container = parsePort(json["container"].getInt)
+
 proc toVethPair(json: JsonNode): VethPair =
   let containerId = json["containerId"].getStr
 
@@ -294,6 +298,10 @@ proc toVethPair(json: JsonNode): VethPair =
   if json["brVeth"]["has"].getBool:
     let brVeth = toNetworkInterface(json["brVeth"]["val"])
     result.brVeth = some(brVeth)
+
+  if json["publishPort"]["has"].getBool:
+    let portPair = toPublishPortPair(json["publishPort"]["val"])
+    result.publishPort = some(portPair)
 
 proc toBridge(json: JsonNode): Bridge =
   result.name = json["name"].getStr
