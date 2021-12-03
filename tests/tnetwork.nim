@@ -83,35 +83,38 @@ suite "Update network_state.json":
 suite "Network object":
   test "JsonNode to Network":
     let
-      json = parseJson("""{"bridges": [{"name": "nicoru0", "natIpAddr": {"val": {"address": "10.0.0.0", "subnetMask": {"val": 24, "has": true}}, "has": true}, "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": {"address": "10.0.0.1", "subnetMask": {"val": 16, "has": true}}, "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "vethPairs": [{"containerId": "61a99c3a25a0ee5888423fe6", "veth": {"val": {"name": "veth0", "ipAddr": {"val": {"address": "10.0.0.2", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true}, "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}}]}], "currentBridgeIndex": 0, "defautHostNic": {"val": {"name": "eth0", "ipAddr": {"val": {"address": "192.168.1.1", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true}}""")
+      json = parseJson("""{"bridges": [{"name": "nicoru0", "natIpAddr": {"val": {"address": "10.0.0.0", "subnetMask": {"val": 24, "has": true}}, "has": true}, "rtVeth": {"val": {"name": "rtVeth0", "ipAddr": {"val": {"address": "10.0.0.1", "subnetMask": {"val": 16, "has": true}}, "has": true}}, "has": true}, "brRtVeth": {"val": {"name": "brRtVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "vethPairs": [{"containerId": "61a9c9a6a5660623f4672b0a", "veth": {"val": {"name": "veth0", "ipAddr": {"val": {"address": "10.0.0.2", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true}, "brVeth": {"val": {"name": "brVeth0", "ipAddr": {"val": {"address": "", "subnetMask": {"val": 0, "has": false}}, "has": false}}, "has": true}, "publishPort": {"val": {"host": 8080, "container": 80}, "has": true}}]}], "currentBridgeIndex": 0, "defautHostNic": {"val": {"name": "eth0", "ipAddr": {"val": {"address": "192.168.1.1", "subnetMask": {"val": 24, "has": true}}, "has": true}}, "has": true}}""")
 
       network = json.toNetwork
+
+    let defautHostNic = network.defautHostNic.get
+    check defautHostNic == NetworkInterface(
+      name: "eth0",
+      ipAddr: some(IpAddr(address: "192.168.1.1", subnetMask: some(24))))
 
     check network.bridges.len == 1
     let bridge = network.bridges[0]
     check bridge.name == "nicoru0"
 
-    check bridge.rtVeth.isSome
+    check bridge.natIpAddr.get == IpAddr(address: "10.0.0.0", subnetMask: some(24))
+
     check bridge.rtVeth.get.name == "rtVeth0"
-    check bridge.rtVeth.get.ipAddr.isSome
     check bridge.rtVeth.get.ipAddr.get == IpAddr(address: "10.0.0.1", subnetMask: some(16))
 
-    check bridge.brRtVeth.isSome
     check bridge.brRtVeth.get.name == "brRtVeth0"
     check bridge.brRtVeth.get.ipAddr.isNone
 
     check bridge.vethPairs.len == 1
     let vethPair = bridge.vethPairs[0]
-    check vethPair.containerId == "61a99c3a25a0ee5888423fe6"
+    check vethPair.containerId == "61a9c9a6a5660623f4672b0a"
 
-    check vethPair.veth.isSome
     check vethPair.veth.get.name == "veth0"
-    check vethPair.veth.get.ipAddr.isSome
     check vethPair.veth.get.ipAddr.get == IpAddr(address: "10.0.0.2", subnetMask: some(24))
 
-    check vethPair.brVeth.isSome
     check vethPair.brVeth.get.name == "brVeth0"
     check vethPair.brVeth.get.ipAddr.isNone
+
+    check vethPair.publishPort.get == PublishPortPair(host: Port(8080), container: Port(80))
 
   test "Remove NetworkInterface from Network":
     let
