@@ -1,6 +1,6 @@
 {.deadCodeElim:on.}
 
-import posix, linux, strformat
+import posix, linux, strformat, strutils
 import syscall
 
 const
@@ -44,6 +44,8 @@ const
   # Can get size with "sizeof (struct inotify_event)" in C
   INOTIFY_EVENT_SZIE* = 32768
 
+proc toPid*(str: string): Pid = Pid(str.parseInt)
+
 # Exception
 type Error = object of Exception
 
@@ -68,6 +70,8 @@ proc chdir(path: cstring): cint {.importc, header:"<linux/unistd.h>"}
 proc sethostname(name: cstring, len: csize_t): cint {.importc, header:"<linux/unistd.h>"}
 
 proc setenv(name, value: cstring, overwrite: cint): cint {.importc, header: "<stdlib.h>"}
+
+proc setns(fd, nstype: cint): cint {.importc, header: "<sched.h>".}
 
 ## Raw system call
 
@@ -168,3 +172,11 @@ proc execvp*(command: seq[string]) =
 
   let exitCode = execvp(cmd, args)
   if exitCode < 0: exception(fmt "Failed execv: {exitCode}")
+
+proc open*(a1: string, a2: int, mode: Mode): int =
+  result = posix.open(cstring(a1), cint(a2), mode)
+  if result < 0: exception(fmt "Failed open: {result}")
+
+proc setns*(fd, nstype: int) =
+  let exitCode = setns(cint(fd), cint(nstype))
+  if exitCode < 0: exception(fmt "Failed setns {exitCode}")

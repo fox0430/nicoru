@@ -1,5 +1,6 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils, linux
-import image, linuxutils, settings, cgroups, seccomputils
+import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
+       linux
+import image, linuxutils, settings, cgroups, seccomputils, network
 
 type State = enum
   running
@@ -286,14 +287,27 @@ proc createContainer*(settings: RuntimeSettings,
       manifestJson = parseFile(imgHashPath / imageId[7 .. ^1])
 
 proc exitContainer(config: var ContainerConfig,
+                   network: var Network,
+                   settings: RuntimeSettings,
                    state: State,
-                   configPath: string) =
-
-  # exit pivot_root
-  chroot(".")
+                   bridgeName, configPath: string) =
 
   config.state = state
   config.updateContainerConfigJson(configPath)
+
+  if NetworkMode.bridge == settings.networkMode:
+    let
+      bridge = network.bridges.getBridge(bridgeName)
+      vethPair = bridge.getVethPair(config.containerId)
+
+    if vethPair.publishPort.isSome and network.defautHostNic.isSome:
+      removeContainerIptablesRule(vethPair,
+                                  vethPair.publishPort.get,
+                                  network.defautHostNic.get,
+                                  bridge.natIpAddr.get)
+
+  network.removeIpFromNetworkInterface(bridgeName, config.containerId)
+  network.updateNetworkState(networkStatePath())
 
 proc isCgroups(cgroups: CgroupsSettgings): bool {.inline.} =
   cgroups.cpu or cgroups.cpuCore or cgroups.memory
@@ -310,15 +324,80 @@ proc setEnv(envs: seq[string]) =
       value = envSplit[1]
     setenv(name, value, 1)
 
+proc createNamespaces(networkMode: NetworkMode) =
+  var flags = CLONE_NEWUTS or CLONE_NEWIPC or CLONE_NEWPID or CLONE_NEWNS
+
+  case networkMode:
+    of NetworkMode.none, NetworkMode.bridge:
+      flags = flags or CLONE_NEWNET
+    else:
+      discard
+
+  unshare(flags)
+
 proc execContainer*(settings: RuntimeSettings,
                     config: var ContainerConfig,
+                    portPair: Option[PublishPortPair],
                     containersDir: string) =
 
-  let imageId = config.imageId
-
-  # TODO: Fix name
   let
     containerId = config.containerId
+
+    isBridgeMode = NetworkMode.bridge == settings.networkMode
+
+  while isLockedNetworkStateFile(networkStatePath()):
+    sleep 500
+
+  lockNetworkStatefile(networkStatePath())
+
+  let
+    isLocked = isLockedNetworkStateFile(networkStatePath())
+    currentNetworkStatePath = if isLocked: lockedNetworkStatePath()
+                              else: networkStatePath()
+
+  var network = initNicoruNetwork(currentNetworkStatePath, isBridgeMode)
+
+  if isBridgeMode:
+    let index = network.currentBridgeIndex
+
+    network.bridges[index].addNewNetworkInterface(
+      containerId,
+      baseVethName(),
+      baseBrVethName(),
+      isBridgeMode)
+
+    if portPair.isSome:
+      network.bridges[index].vethPairs[^1].setPublishPortPair(portPair.get)
+
+  network.updateNetworkState(currentNetworkStatePath)
+  unlockNetworkStatefile(networkStatePath())
+
+  let
+    bridge = network.bridges[network.currentBridgeIndex]
+    bridgeName = bridge.name
+
+  # Create a user defined bridge
+  if defaultBridgeName() != bridge.name:
+    if not bridgeExists(bridgeName):
+      createBridge(network.bridges[^1])
+
+  if isBridgeMode:
+    if network.defautHostNic.isSome:
+      setNat(network.defautHostNic.get, bridge.natIpAddr.get)
+
+    let vethPair = bridge.vethPairs[^1]
+
+    createVethPair(vethPair.getBrVethName.get, vethPair.getVethName.get)
+
+    if vethPair.publishPort.isSome and network.defautHostNic.isSome:
+      setPortForward(vethPair.getVethIpAddr,
+                     vethPair.publishPort.get,
+                     network.defautHostNic.get)
+
+  let
+    imageId = config.imageId
+
+    # TODO: Fix name
     containerDir = containersDir / containerId
 
     parentPid = getpid()
@@ -326,12 +405,17 @@ proc execContainer*(settings: RuntimeSettings,
 
   if getpid() != parentPid:
 
-    const flags = CLONE_NEWUTS or CLONE_NEWIPC or CLONE_NEWPID or CLONE_NEWNS
-    unshare(flags)
+    # Create Linux namespaces using unshare syscall
+    createNamespaces(settings.networkMode)
+
     let secondForkPid = fork()
 
     if getpid() == 1:
       let manifestJson = parseFile(settings.imagesHashPath(imageId))
+
+      # Set up container network
+      if isBridgeMode:
+        bridge.vethPairs[^1].initContainerNetwork(bridge.getRtVethIpAddr)
 
       mount("/", "/", "none", MS_PRIVATE or MS_REC)
 
@@ -418,7 +502,6 @@ proc execContainer*(settings: RuntimeSettings,
 
       writeFile(containerDir / "pid", $secondForkPid)
 
-      # TODO: Delete
       if not settings.background:
         var status: cint
         discard waitpid(secondForkPid, status, WUNTRACED)
@@ -434,20 +517,28 @@ proc execContainer*(settings: RuntimeSettings,
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
 
+    if isBridgeMode:
+      # Add network interface
+      addInterfaceToContainer(bridge.vethPairs[^1], pid.toPid)
+
+      connectVethToBridge(bridge.vethPairs[^1].getBrVethName.get, bridgeName)
+
+    # TODO: Delete
     var status: cint
     discard waitpid(firstForkPid, status, WUNTRACED)
 
     let configPath = "config.json"
     if WIFEXITED(status):
-      config.exitContainer(State.stop, configPath)
+      config.exitContainer(network, settings, State.stop, bridgeName, configPath)
     else:
-      config.exitContainer(State.dead, configPath)
+      config.exitContainer(network, settings, State.dead, bridgeName, configPath)
 
 proc isRootUser(): bool {.inline.} = geteuid() == 0
 
 proc runContainer*(settings: RuntimeSettings,
                    cgroupSettings: CgroupsSettgings,
                    repo, tag, containersDir: string,
+                   portPair: Option[PublishPortPair],
                    command: seq[string]) =
 
   var config = settings.createContainer(
@@ -458,7 +549,7 @@ proc runContainer*(settings: RuntimeSettings,
     command)
 
   if isRootUser():
-    execContainer(settings, config, containersDir)
+    execContainer(settings, config, portPair, containersDir)
   else:
     # TODO: Add Root-less mode
     echo "Error: You need to be root to run nicoru."
@@ -507,6 +598,7 @@ proc getContainerConfig(containesrsDir, containerId: string): ContainerConfig =
           discard
 
 proc startContainer*(settings: RuntimeSettings,
+                     portPair: Option[PublishPortPair],
                      containersDir, containerId: string) =
 
   var config = getContainerConfig(containersDir, containerId)
@@ -526,7 +618,7 @@ proc startContainer*(settings: RuntimeSettings,
 
   if isRootUser():
     # Normal mode
-    execContainer(settings, config, containersDir)
+    execContainer(settings, config, portPair, containersDir)
   else:
     # TODO: Add Rootless mode
     echo "Error: You need to be root to run nicoru."

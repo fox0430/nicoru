@@ -38,6 +38,11 @@ nicoru run -d ubuntu
 nicoru run -d alpine:latest
 ```
 
+Run a container and publish port
+```
+nicoru run --net=bridge --port=8080:80 ubuntu
+```
+
 Pull an image from a registry (Docker Hub).
 
 ```
