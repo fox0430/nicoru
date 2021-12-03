@@ -282,7 +282,7 @@ proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
-      containerId = args[1]
+      containerId = ContainerId(args[1])
     removeContainer(containersDir, containerId)
   else:
     writeCmdLineError($args)
@@ -312,7 +312,7 @@ proc cmdStart(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) 
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
-      containerId = args[1]
+      containerId = ContainerId(args[1])
 
     # Set a network mode
     var portPair = none(PublishPortPair)
@@ -342,7 +342,7 @@ proc cmdLog(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
-      containerId = args[1]
+      containerId = ContainerId(args[1])
     writeContainerLog(containersDir, containerId)
   else:
     writeCmdLineError($args)
@@ -359,7 +359,7 @@ proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
-      containerId = args[1]
+      containerId = ContainerId(args[1])
       isForce = if shortOptions.containsKey("f"): true else: false
     if isForce:
       forceStopContainer(containersDir, containerId)
