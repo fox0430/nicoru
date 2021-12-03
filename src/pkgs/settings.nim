@@ -1,6 +1,4 @@
-import os, options, strformat
-import linuxutils
-
+import os
 
 type NetworkMode* {.pure.} = enum
   none
