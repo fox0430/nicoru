@@ -87,8 +87,8 @@ suite "Network object":
 
       network = json.toNetwork
 
-    let defautHostNic = network.defautHostNic.get
-    check defautHostNic == NetworkInterface(
+    check network.defautHostNic.isSome
+    check network.defautHostNic.get == NetworkInterface(
       name: "eth0",
       ipAddr: some(IpAddr(address: "192.168.1.1", subnetMask: some(24))))
 
@@ -96,11 +96,15 @@ suite "Network object":
     let bridge = network.bridges[0]
     check bridge.name == "nicoru0"
 
+    check bridge.natIpAddr.isSome
     check bridge.natIpAddr.get == IpAddr(address: "10.0.0.0", subnetMask: some(24))
 
+    check bridge.rtVeth.isSome
     check bridge.rtVeth.get.name == "rtVeth0"
+    check bridge.rtVeth.get.ipAddr.isSome
     check bridge.rtVeth.get.ipAddr.get == IpAddr(address: "10.0.0.1", subnetMask: some(16))
 
+    check bridge.brRtVeth.isSome
     check bridge.brRtVeth.get.name == "brRtVeth0"
     check bridge.brRtVeth.get.ipAddr.isNone
 
@@ -108,12 +112,16 @@ suite "Network object":
     let vethPair = bridge.vethPairs[0]
     check vethPair.containerId == "61a9c9a6a5660623f4672b0a"
 
+    check vethPair.veth.isSome
     check vethPair.veth.get.name == "veth0"
+    check vethPair.veth.get.ipAddr.isSome
     check vethPair.veth.get.ipAddr.get == IpAddr(address: "10.0.0.2", subnetMask: some(24))
 
+    check vethPair.brVeth.isSome
     check vethPair.brVeth.get.name == "brVeth0"
     check vethPair.brVeth.get.ipAddr.isNone
 
+    check vethPair.publishPort.isSome
     check vethPair.publishPort.get == PublishPortPair(host: Port(8080), container: Port(80))
 
   test "Remove NetworkInterface from Network":
