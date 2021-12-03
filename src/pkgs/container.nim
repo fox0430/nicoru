@@ -355,13 +355,10 @@ proc execContainer*(settings: RuntimeSettings,
     currentNetworkStatePath = if isLocked: lockedNetworkStatePath()
                               else: networkStatePath()
 
-  var network = initNicoruNetwork(currentNetworkStatePath)
+  var network = initNicoruNetwork(currentNetworkStatePath, isBridgeMode)
 
   if isBridgeMode:
     let index = network.currentBridgeIndex
-
-    network.bridges[index].setBridgeIpAddr
-    network.bridges[index].setNatIpAddr
 
     network.bridges[index].addNewNetworkInterface(
       containerId,

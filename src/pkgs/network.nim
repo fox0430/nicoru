@@ -673,7 +673,7 @@ proc initContainerNetwork*(vethPair: VethPair, rtVethIpAddr: IpAddr) =
 
   setDefaultGateWay(rtVethIpAddr)
 
-proc initNicoruNetwork*(networkStatePath: string): Network =
+proc initNicoruNetwork*(networkStatePath: string, isBridgeMode: bool): Network =
   const BRIDGE_NAME = defaultBridgeName()
 
   result = loadNetworkState(networkStatePath)
@@ -684,5 +684,9 @@ proc initNicoruNetwork*(networkStatePath: string): Network =
   if result.bridges.len == 0:
     result.bridges.add initBridge(BRIDGE_NAME)
 
+  if isBridgeMode:
+    result.bridges[^1].setBridgeIpAddr
+    result.bridges[^1].setNatIpAddr
+
   if not bridgeExists(BRIDGE_NAME):
-    createBridge(result.bridges[0])
+    createBridge(result.bridges[^1])
