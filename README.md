@@ -16,6 +16,11 @@ NOTE: Work in progress.
 
 - Seccomp
 
+- Networking
+  - host (default)
+  - bridge
+  - none
+
 ## Installation
 
 nicoru can run on only GNU/Linux
@@ -24,8 +29,8 @@ nicoru can run on only GNU/Linux
 
 - Nim v1.6.0 or higher
 - libseccomp
-- ip*(8) (Optional)
-- iptables*(8) (Optional)
+- ip(8) (Optional)
+- iptables(8) (Optional)
 
 ```
 nimble install nicoru
