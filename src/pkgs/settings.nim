@@ -16,7 +16,7 @@ type
 
 proc initRuntimeSetting*(): RuntimeSettings {.inline.} =
   result.baseDir = getHomeDir() / ".local/share/nicoru"
-  result.networkMode = NetworkMode.none
+  result.networkMode = NetworkMode.host
 
 proc shortId*(imageId: string): string {.inline.} =
   return imageId[7 .. ^1]
