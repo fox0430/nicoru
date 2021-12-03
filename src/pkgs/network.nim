@@ -22,6 +22,8 @@ type
   Bridge* = object
     # Bridge name
     name*: string
+    # NAT ip address
+    natIpAddr*: Option[IpAddr]
     # Connet to default NIC
     rtVeth: Option[NetworkInterface]
     # Connect a bridge with rtVeth (Doesn't have a IP Address)
@@ -31,6 +33,7 @@ type
 
   Network* = object
     bridges*: seq[Bridge]
+
     currentBridgeIndex*: int
     # Default (Preferred) network interface on host
     defautHostNic*: Option[NetworkInterface]
@@ -50,16 +53,16 @@ proc baseBrVethName*(): string {.inline.} =
 proc defaultBridgeName*(): string {.inline.} =
   return "nicoru0"
 
-proc defaultBridgeIpAddr*(): IpAddr {.inline.} =
+proc defaultBridgeIpAddr(): IpAddr {.inline.} =
   return IpAddr(address: "10.0.0.1", subnetMask: some(16))
 
-proc defaultRtBridgeVethName*(): string {.inline.} =
+proc defaultRtBridgeVethName(): string {.inline.} =
   return "rtVeth0"
 
-proc defaultRtRtBridgeVethName*(): string {.inline.} =
+proc defaultRtRtBridgeVethName(): string {.inline.} =
   return "brRtVeth0"
 
-proc defaultNatAddress*(): IpAddr {.inline.} =
+proc defaultNatAddress(): IpAddr {.inline.} =
   return IpAddr(address: "10.0.0.0", subnetMask: some(24))
 
 # TODO: Move
@@ -225,15 +228,25 @@ proc initVethPair(containerId: string,
 
 proc initBridge*(bridgeName: string): Bridge =
   let
-    rtVethIpAddr = some(defaultBridgeIpAddr())
-    rtVeth = NetworkInterface(name: defaultRtBridgeVethName(),
-                              ipAddr: rtVethIpAddr)
+    rtVeth = NetworkInterface(name: defaultRtBridgeVethName())
     brRtVeth = NetworkInterface(name: defaultRtRtBridgeVethName())
 
   return Bridge(name: bridgeName,
                 rtVeth: some(rtVeth),
                 brRtVeth: some(brRtVeth),
                 vethPairs: @[])
+
+proc setBridgeIpAddr*(bridge: var Bridge,
+                      ipAddr: IpAddr = defaultBridgeIpAddr()) {.inline.} =
+
+  if bridge.rtVeth.isSome and bridge.rtVeth.get.ipAddr.isNone:
+    bridge.rtVeth.get.ipAddr = some(ipAddr)
+
+proc setNatIpAddr*(bridge: var Bridge,
+                   ipAddr: IpAddr = defaultNatAddress()) {.inline.} =
+
+  if bridge.natIpAddr.isNone:
+    bridge.natIpAddr = some(ipAddr)
 
 proc toIpAddr(json: JsonNode): IpAddr =
   result.address = json["address"].getStr
@@ -264,6 +277,9 @@ proc toVethPair(json: JsonNode): VethPair =
 
 proc toBridge(json: JsonNode): Bridge =
   result.name = json["name"].getStr
+
+  if json["natIpAddr"]["has"].getBool:
+    result.natIpAddr = some(toIpAddr(json["natIpAddr"]["val"]))
 
   if json["rtVeth"]["has"].getBool:
     let rtVeth = toNetworkInterface(json["rtVeth"]["val"])
@@ -313,8 +329,8 @@ proc loadNetworkState*(networkStatePath: string): Network =
   else:
     return Network(bridges: @[], defautHostNic: getDefaultNetworkInterface())
 
-proc getCurrentBridgeIndex*(
-  bridges: seq[Bridge], bridgeName: string): Option[int] =
+proc getCurrentBridgeIndex*(bridges: seq[Bridge],
+                            bridgeName: string): Option[int] =
 
   for index, b in bridges:
     if b.name == bridgeName:
@@ -603,7 +619,8 @@ proc removeIptablesRule(rule: string) =
 
 proc removeContainerIptablesRule*(vethPair: VethPair,
                                   portPair: PublishPortPair,
-                                  defautHostNic: NetworkInterface) =
+                                  defautHostNic: NetworkInterface,
+                                  natIpAddr: IpAddr) =
 
   if defautHostNic.ipAddr.isSome:
     let
@@ -625,11 +642,8 @@ proc removeContainerIptablesRule*(vethPair: VethPair,
 
     block:
       let
-        # TODO: Remove
-        ipAddr = defaultNatAddress()
         interfaceName = defautHostNic.name
-
-        cmd = fmt"iptables -t nat -D POSTROUTING -s {ipAddr} -o {interfaceName} -j MASQUERADE"
+        cmd = fmt"iptables -t nat -D POSTROUTING -s {natIpAddr} -o {interfaceName} -j MASQUERADE"
       discard execShellCmd(cmd)
 
 proc lockNetworkStatefile*(networkStatePath: string) {.inline.} =

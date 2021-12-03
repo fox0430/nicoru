@@ -304,7 +304,8 @@ proc exitContainer(config: var ContainerConfig,
       vethPair = bridge.getVethPair(config.containerId)
     removeContainerIptablesRule(vethPair,
                                 settings.publishPort.get,
-                                network.defautHostNic.get)
+                                network.defautHostNic.get,
+                                bridge.natIpAddr.get)
 
   network.removeIpFromNetworkInterface(bridgeName, config.containerId)
   network.updateNetworkState(networkStatePath())
@@ -356,11 +357,17 @@ proc execContainer*(settings: RuntimeSettings,
 
   var network = initNicoruNetwork(currentNetworkStatePath)
 
-  network.bridges[network.currentBridgeIndex].addNewNetworkInterface(
-    containerId,
-    baseVethName(),
-    baseBrVethName(),
-    isBridgeMode)
+  if isBridgeMode:
+    let index = network.currentBridgeIndex
+
+    network.bridges[index].setBridgeIpAddr
+    network.bridges[index].setNatIpAddr
+
+    network.bridges[index].addNewNetworkInterface(
+      containerId,
+      baseVethName(),
+      baseBrVethName(),
+      isBridgeMode)
 
   network.updateNetworkState(currentNetworkStatePath)
   unlockNetworkStatefile(networkStatePath())
@@ -377,7 +384,7 @@ proc execContainer*(settings: RuntimeSettings,
 
   if isBridgeMode:
     if network.defautHostNic.isSome:
-      setNat(network.defautHostNic.get, defaultNatAddress())
+      setNat(network.defautHostNic.get, bridge.natIpAddr.get)
 
     createVethPair(iface.getBrVethName.get, iface.getVethName.get)
 
