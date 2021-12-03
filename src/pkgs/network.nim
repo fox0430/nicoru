@@ -233,11 +233,11 @@ proc parsePort*(num: int): Port =
 proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
   return PublishPortPair(host: parsePort(hPort), container: parsePort(cPort))
 
-proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface =
+proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface {.inline.} =
   return NetworkInterface(name: name, ipAddr: some(ipAddr))
 
 proc initVethPair(containerId: string,
-                  veth, brVeth: NetworkInterface): VethPair =
+                  veth, brVeth: NetworkInterface): VethPair {.inline.} =
 
   return VethPair(containerId: containerId,
                   veth: some(veth),
@@ -253,7 +253,7 @@ proc initBridge*(bridgeName: string): Bridge =
                 brRtVeth: some(brRtVeth),
                 vethPairs: @[])
 
-proc setPublishPortPair*(vethPair: var VethPair, portPair: PublishPortPair) =
+proc setPublishPortPair*(vethPair: var VethPair, portPair: PublishPortPair) {.inline.} =
   vethPair.publishPort = some(portPair)
 
 proc setBridgeIpAddr*(bridge: var Bridge,
@@ -329,11 +329,11 @@ proc toNetwork(json: JsonNode): Network =
     let iface = toNetworkInterface(json["defautHostNic"]["val"])
     result.defautHostNic = some(iface)
 
-proc getVethName*(vethPair: VethPair): Option[string] =
+proc getVethName*(vethPair: VethPair): Option[string] {.inline.} =
   if vethPair.veth.isSome:
     return some(vethPair.veth.get.name)
 
-proc getBrVethName*(vethPair: VethPair): Option[string] =
+proc getBrVethName*(vethPair: VethPair): Option[string] {.inline.} =
   if vethPair.brVeth.isSome:
     return some(vethPair.brVeth.get.name)
 
