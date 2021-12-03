@@ -19,6 +19,7 @@ type
     ipAddr: Option[IpAddr]
 
   VethPair* = object
+    # TODO: Use container.ContainerId
     containerId: string
     # Created inside a container
     veth: Option[NetworkInterface]
@@ -210,8 +211,9 @@ proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
 
   exception(fmt"Bridge object not found: '{bridgeName}'")
 
+# TODO: Use container.ContainerId
 proc getVethPair*(bridge: Bridge,
-                          containerId: string): VethPair =
+                  containerId: string): VethPair =
 
   for vethPair in bridge.vethPairs:
     if vethPair.containerId == containerId:
@@ -236,9 +238,11 @@ proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
 proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface {.inline.} =
   return NetworkInterface(name: name, ipAddr: some(ipAddr))
 
+# TODO: Use container.ContainerId
 proc initVethPair(containerId: string,
                   veth, brVeth: NetworkInterface): VethPair {.inline.} =
 
+# TODO: Use container.ContainerId
   return VethPair(containerId: containerId,
                   veth: some(veth),
                   brVeth: some(brVeth))
@@ -405,6 +409,7 @@ proc newVethIpAddr(vethPairs: seq[VethPair]): string =
 
   return fmt"10.0.0.{maxNum + 1}"
 
+# TODO Use container.ContainerId
 # Add a new iface to Bridge.iface
 proc addNewNetworkInterface*(bridge: var Bridge,
                              containerId, baseVethName, baseBrVethName: string,
@@ -435,6 +440,7 @@ proc addNewNetworkInterface*(bridge: var Bridge,
 proc add*(bridge: var Bridge, vethPair: VethPair) =
   bridge.vethPairs.add vethPair
 
+# TODO Use container.ContainerId
 proc addIpToNetworkInterface(containerId, ipAddr: string) =
   const filePath = networkStatePath()
 
@@ -460,6 +466,7 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
     try: writeFile(filePath, $json)
     except: exception(fmt"Failed to write a json: '{filePath}'")
 
+# TODO Use container.ContainerId
 proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:

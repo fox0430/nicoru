@@ -2,22 +2,27 @@ import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
        linux
 import image, linuxutils, settings, cgroups, seccomputils, network
 
-type State = enum
-  running
-  stop
-  dead
+type
+  ContainerId* = distinct string
 
-type ContainerConfig = object
-  containerId: string
-  imageId: string
-  repo: string
-  tag: string
-  state: State
-  pid: Pid
-  hostname: string
-  env: seq[string]
-  cmd: seq[string]
-  cgroups: CgroupsSettgings
+  State = enum
+    running
+    stop
+    dead
+
+  ContainerConfig = object
+    containerId: ContainerId
+    imageId: string
+    repo: string
+    tag: string
+    state: State
+    pid: Pid
+    hostname: string
+    env: seq[string]
+    cmd: seq[string]
+    cgroups: CgroupsSettgings
+
+proc `$`*(containerId: ContainerId): string {.inline.} = string(containerId)
 
 proc checkContainerState(json: JsonNode): State =
   for key, item in json["State"]:
@@ -48,20 +53,20 @@ proc writeAllContainerState*(containesrDir: string) =
   for s in list:
     echo s
 
-proc isExistContainer(containesrsDir, containerId: string): bool =
+proc isExistContainer(containesrsDir: string, containerId: ContainerId): bool =
   for p in walkDir(containesrsDir):
     let kind = p.kind
     if kind == pcDir:
       let
         pathSplit = splitPath(p.path)
         name = pathSplit.tail
-      if name == containerId:
+      if name == $containerId:
         return true
 
-proc removeContainer*(containesrsDir, containerId: string) =
+proc removeContainer*(containesrsDir: string, containerId: ContainerId) =
   if isExistContainer(containesrsDir, containerId):
     let
-      dir = containesrsDir / containerId
+      dir = containesrsDir / $containerId
 
     try:
       removeDir(dir)
@@ -78,7 +83,7 @@ proc initContainerConfigJson(config: ContainerConfig): JsonNode =
     "memoryLimit": config.cgroups.memoryLimit
   }
 
-  %* { "ContainerId": config.containerId,
+  %* { "ContainerId": $config.containerId,
        "Repository": config.repo,
        "Tag": config.tag,
        "State": {"Running": true, "Stop": false, "Dead": false},
@@ -110,7 +115,7 @@ proc updateContainerConfigJson(config: ContainerConfig,
     "memoryLimit": config.cgroups.memoryLimit
   }
 
-  let json = %* { "ContainerId": config.containerId,
+  let json = %* { "ContainerId": $config.containerId,
                   "Repository": config.repo,
                   "Tag": config.tag,
                   "State": stateJson,
@@ -137,7 +142,7 @@ proc initContainerConfig(settings: RuntimeSettings,
   if not fileExists(configPath):
     let hostname = if blob.config.hostname.len() > 0: blob.config.hostname
                    else: containerId
-    result = ContainerConfig(containerId: containerId,
+    result = ContainerConfig(containerId: ContainerId(containerId),
                              imageId: imageId,
                              repo: repo,
                              tag: tag,
@@ -298,7 +303,7 @@ proc exitContainer(config: var ContainerConfig,
   if NetworkMode.bridge == settings.networkMode:
     let
       bridge = network.bridges.getBridge(bridgeName)
-      vethPair = bridge.getVethPair(config.containerId)
+      vethPair = bridge.getVethPair($config.containerId)
 
     if vethPair.publishPort.isSome and network.defautHostNic.isSome:
       removeContainerIptablesRule(vethPair,
@@ -306,7 +311,7 @@ proc exitContainer(config: var ContainerConfig,
                                   network.defautHostNic.get,
                                   bridge.natIpAddr.get)
 
-  network.removeIpFromNetworkInterface(bridgeName, config.containerId)
+  network.removeIpFromNetworkInterface(bridgeName, $config.containerId)
   network.updateNetworkState(networkStatePath())
 
 proc isCgroups(cgroups: CgroupsSettgings): bool {.inline.} =
@@ -361,7 +366,7 @@ proc execContainer*(settings: RuntimeSettings,
     let index = network.currentBridgeIndex
 
     network.bridges[index].addNewNetworkInterface(
-      containerId,
+      $containerId,
       baseVethName(),
       baseBrVethName(),
       isBridgeMode)
@@ -398,7 +403,7 @@ proc execContainer*(settings: RuntimeSettings,
     imageId = config.imageId
 
     # TODO: Fix name
-    containerDir = containersDir / containerId
+    containerDir = containersDir / $containerId
 
     parentPid = getpid()
     firstForkPid = fork()
@@ -566,20 +571,22 @@ proc getCurrentstate(stateJson: JsonNode): State {.inline.} =
           return State.dead
 
 # Get ContainerConfig from config.json
-proc getContainerConfig(containesrsDir, containerId: string): ContainerConfig =
+proc getContainerConfig(containesrsDir: string,
+                        containerId: ContainerId): ContainerConfig =
+
   if not isExistContainer(containesrsDir, containerId):
     echo fmt "Error: No such container: {containerId}"
     quit()
   else:
     let
-      configPath = containesrsDir / containerId / "config.json"
+      configPath = containesrsDir / $containerId / "config.json"
       json = parseFile(configPath)
 
     result = ContainerConfig()
     for key, item in json:
       case key:
         of "ContainerId":
-          result.containerId = item.getStr
+          result.containerId = ContainerId(item.getStr)
         of "Repository":
           result.repo = item.getStr
         of "Tag":
@@ -599,7 +606,8 @@ proc getContainerConfig(containesrsDir, containerId: string): ContainerConfig =
 
 proc startContainer*(settings: RuntimeSettings,
                      portPair: Option[PublishPortPair],
-                     containersDir, containerId: string) =
+                     containersDir:string,
+                     containerId: ContainerId) =
 
   var config = getContainerConfig(containersDir, containerId)
 
@@ -610,8 +618,8 @@ proc startContainer*(settings: RuntimeSettings,
     echo "Error: Not found image in local"
     quit()
 
-  if dirExists(containersDir / config.containerId):
-    chdir(containersDir / config.containerId)
+  if dirExists(containersDir / $config.containerId):
+    chdir(containersDir / $config.containerId)
   else:
     echo fmt "Error: No such container: {config.containerId}"
     quit()
@@ -623,21 +631,21 @@ proc startContainer*(settings: RuntimeSettings,
     # TODO: Add Rootless mode
     echo "Error: You need to be root to run nicoru."
 
-proc writeContainerLog*(containersDir, containerId: string) =
+proc writeContainerLog*(containersDir: string, containerId: ContainerId) =
   if isExistContainer(containersDir, containerId):
     let
-      containerDir = containersDir / containerId
+      containerDir = containersDir / $containerId
       logFilePath = containerDir / "logfile"
     echo readFile(logFilePath)
 
-proc getContainerPid(containersDir, containerId: string): Pid =
+proc getContainerPid(containersDir: string, containerId: ContainerId): Pid =
   let
-    path = containersDir / containerId / "pid"
+    path = containersDir / $containerId / "pid"
     pidStr = readFile(path)
 
   result = Pid(pidStr.parseInt)
 
-proc stopContainer*(containersDir, containerId: string) =
+proc stopContainer*(containersDir: string, containerId: ContainerId) =
   let pid = getContainerPid(containersDir, containerId)
 
   if kill(pid, SIGTERM) != 0:
@@ -645,7 +653,7 @@ proc stopContainer*(containersDir, containerId: string) =
   else:
     echo fmt "Stpod container: {containerId}"
 
-proc forceStopContainer*(containersDir, containerId: string) =
+proc forceStopContainer*(containersDir: string, containerId: ContainerId) =
   let pid = getContainerPid(containersDir, containerId)
 
   if kill(pid, SIGSTOP) != 0:
