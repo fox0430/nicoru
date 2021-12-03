@@ -4,6 +4,12 @@ import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
 import linuxutils, settings
 
 type
+  Port = int
+
+  PublishPortPair* = object
+    host*: Port
+    container*: Port
+
   IpAddr = object
     address: string
     subnetMask: Option[int]
@@ -18,6 +24,8 @@ type
     veth: Option[NetworkInterface]
     # Connect a bridge with veth (Doesn't have a IP Address)
     brVeth: Option[NetworkInterface]
+    # Publish port
+    publishPort*: Option[PublishPortPair]
 
   Bridge* = object
     # Bridge name
@@ -216,6 +224,15 @@ proc `$`(ipAddr: IpAddr): string =
   if ipAddr.subnetMask.isSome:
     result &= "/" & $ipAddr.subnetMask.get
 
+proc parsePort*(num: int): Port =
+  if num >= 0 and num <= 65535:
+    return Port(num)
+  else:
+    exception(fmt"Failed to parsePort: {num}")
+
+proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
+  return PublishPortPair(host: parsePort(hPort), container: parsePort(cPort))
+
 proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface =
   return NetworkInterface(name: name, ipAddr: some(ipAddr))
 
@@ -235,6 +252,9 @@ proc initBridge*(bridgeName: string): Bridge =
                 rtVeth: some(rtVeth),
                 brRtVeth: some(brRtVeth),
                 vethPairs: @[])
+
+proc setPublishPortPair*(vethPair: var VethPair, portPair: PublishPortPair) =
+  vethPair.publishPort = some(portPair)
 
 proc setBridgeIpAddr*(bridge: var Bridge,
                       ipAddr: IpAddr = defaultBridgeIpAddr()) {.inline.} =

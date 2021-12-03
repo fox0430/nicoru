@@ -8,14 +8,6 @@ type NetworkMode* {.pure.} = enum
   host
 
 type
-  # TODO: Move
-  Port = int
-
-  # TODO: Move to network?
-  PublishPortPair* = object
-    host*: Port
-    container*: Port
-
   RuntimeSettings* = object
     baseDir*: string
     debug*: bool
@@ -23,21 +15,10 @@ type
     seccomp*: bool
     seccompProfilePath*: string
     networkMode*: NetworkMode
-    publishPort*: Option[PublishPortPair]
 
 proc initRuntimeSetting*(): RuntimeSettings {.inline.} =
   result.baseDir = getHomeDir() / ".local/share/nicoru"
   result.networkMode = NetworkMode.none
-
-# TODO: Move
-proc parsePort*(num: int): Port =
-  if num >= 0 and num <= 65535:
-    return Port(num)
-  else:
-    exception(fmt"Failed to parsePort: {num}")
-
-proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
-  return PublishPortPair(host: parsePort(hPort), container: parsePort(cPort))
 
 proc shortId*(imageId: string): string {.inline.} =
   return imageId[7 .. ^1]

@@ -1,5 +1,5 @@
 import parseopt, strformat, os, strutils, pegs, options
-import settings, help, container, image, cgroups
+import settings, help, container, image, cgroups, network
 
 type CmdOption* = object
   key*: string
@@ -225,6 +225,7 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
         writeCmdLineError($args)
 
     # Set a network mode
+    var portPair = none(PublishPortPair)
     if cmdParseInfo.longOptions.containsKey("net"):
       let networkMode = cmdParseInfo.longOptions["net"]
       if isNetworkMode(networkMode):
@@ -232,8 +233,7 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
         if cmdParseInfo.longOptions.containsKey("port"):
           if NetworkMode.bridge == runtimeSettings.networkMode:
-            let portPair = parsePublishPort(cmdParseInfo.longOptions["port"])
-            runtimeSettings.publishPort = some(portPair)
+            portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
           else:
             # TODO: Fix
             writeCmdLineError($args)
@@ -258,6 +258,7 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
         image,
         tag,
         containersDir,
+        portPair,
         command)
 
 proc cmdPs(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
@@ -300,18 +301,34 @@ proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   else:
     writeCmdLineError($args)
 
-proc cmdStart(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
+proc cmdStart(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
 
   if isHelp(args, cmdParseInfo.shortOptions):
     writeStartHelp()
   elif args.len == 1:
     writeNotEnoughArgError("start", 1)
+
   elif args.len == 2:
     let
       containersDir = runtimeSettings.baseDir / "containers"
       containerId = args[1]
-    startContainer(runtimeSettings, containersDir, containerId)
+
+    # Set a network mode
+    var portPair = none(PublishPortPair)
+    if cmdParseInfo.longOptions.containsKey("net"):
+      let networkMode = cmdParseInfo.longOptions["net"]
+      if isNetworkMode(networkMode):
+        runtimeSettings.networkMode = cmdParseInfo.longOptions["net"].toNetworkMode
+
+        if cmdParseInfo.longOptions.containsKey("port"):
+          if NetworkMode.bridge == runtimeSettings.networkMode:
+            portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
+          else:
+            # TODO: Fix
+            writeCmdLineError($args)
+
+    startContainer(runtimeSettings, portPair, containersDir, containerId)
   else:
     writeCmdLineError($args)
 
