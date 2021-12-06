@@ -1,5 +1,5 @@
 import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
-       linux
+       linux, oids
 import image, linuxutils, settings, cgroups, seccomputils, network
 
 type
@@ -22,7 +22,14 @@ type
     cmd: seq[string]
     cgroups: CgroupsSettgings
 
+proc genContainerId*(): ContainerId {.inline.} = ContainerId($genOid())
+
 proc `$`*(containerId: ContainerId): string {.inline.} = string(containerId)
+
+proc containerConfigPath*(settings: RuntimeSettings,
+                          containerId: ContainerId): string {.inline.} =
+
+  return settings.containersPath() / $containerId / "config.json"
 
 proc checkContainerState(json: JsonNode): State =
   for key, item in json["State"]:
@@ -129,7 +136,8 @@ proc updateContainerConfigJson(config: ContainerConfig,
   writeFile(configPath, $json)
 
 proc initContainerConfig(settings: RuntimeSettings,
-                         imageId, containerId, repo, tag: string,
+                         containerId: ContainerId,
+                         imageId, repo, tag: string,
                          cgroups: CgroupsSettgings): ContainerConfig =
 
   let
@@ -141,7 +149,7 @@ proc initContainerConfig(settings: RuntimeSettings,
 
   if not fileExists(configPath):
     let hostname = if blob.config.hostname.len() > 0: blob.config.hostname
-                   else: containerId
+                   else: $containerId
     result = ContainerConfig(containerId: ContainerId(containerId),
                              imageId: imageId,
                              repo: repo,
@@ -155,8 +163,8 @@ proc initContainerConfig(settings: RuntimeSettings,
     let json = initContainerConfigJson(result)
     writeFile(configPath, $json)
 
-proc putHostnameFile(containerId, path: string) =
-  let hostname = containerId[0 .. 12]
+proc putHostnameFile(containerId: ContainerId, path: string) =
+  let hostname = ($containerId)[0 .. 12]
   writeFile(path, hostname)
 
 proc setUplowerDir(settings: RuntimeSettings, layers: JsonNode): string =
@@ -258,7 +266,7 @@ proc createContainer*(settings: RuntimeSettings,
                       cgroups: CgroupsSettgings,
                       command: seq[string]): ContainerConfig  =
 
-  let containerId = $genOid()
+  let containerId = genContainerId()
 
   echo fmt"Create container: {containerId}"
 
@@ -266,13 +274,13 @@ proc createContainer*(settings: RuntimeSettings,
 
   let imageId = settings.getImageIdFromLocal(repo, tag)
 
-  let cDir = containersDir / containerId
+  let cDir = containersDir / $containerId
   if not dirExists(cDir):
     createDir(cDir)
 
   result = settings.initContainerConfig(
-    imageId,
     containerId,
+    imageId,
     repo,
     tag,
     cgroups)
