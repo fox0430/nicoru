@@ -168,7 +168,7 @@ proc putHostnameFile(containerId: ContainerId, path: string) =
   writeFile(path, hostname)
 
 proc setUplowerDir(settings: RuntimeSettings, layers: JsonNode): string =
-  for i in 0 ..< layers.len:
+  for i in countdown(layers.len - 1, 0):
     let
       blob = layers[i]["digest"].getStr
       id = blob.shortId()
@@ -177,7 +177,7 @@ proc setUplowerDir(settings: RuntimeSettings, layers: JsonNode): string =
     if dirExists(layerDir / id):
       result &= layerDir / id
 
-      if i  < layers.len - 1:
+      if i  > 0:
         result &= ":"
 
 proc setOverlayfs(settings: RuntimeSettings, layers: JsonNode, isRootless: bool) =
