@@ -1,4 +1,4 @@
-import os, strformat, httpclient, json, asyncdispatch, strutils, osproc
+import std/[os, strformat, httpclient, json, asyncdispatch, strutils, osproc]
 import settings
 
 type ImageInfo = object
