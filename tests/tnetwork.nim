@@ -1,4 +1,4 @@
-import unittest, oids
+import unittest
 import src/pkgs/settings
 include src/pkgs/network
 
@@ -8,7 +8,7 @@ suite "Update network_state.json":
 
     let
       # TODO: Fix
-      containerId = $genOid()
+      containerId = genContainerId()
 
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
       veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))

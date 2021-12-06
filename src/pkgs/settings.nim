@@ -48,9 +48,6 @@ proc layerPath*(settings: RuntimeSettings): string {.inline.} =
 proc layerPath*(settings: RuntimeSettings, blob: string): string {.inline.} =
   return settings.baseDir / "layer" / shortId(blob)
 
-proc containerConfigPath*(settings: RuntimeSettings, containerId: string): string {.inline.} =
-  return settings.containersPath() / containerId / "config.json"
-
 proc netNsPath*(): string {.inline.} =
   return "/var/run/nicoru/netns"
 
