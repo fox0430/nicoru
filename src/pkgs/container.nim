@@ -1,5 +1,5 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
-       linux, oids
+import std/[os, oids, strformat, json, osproc, posix, inotify, strutils, options,
+            linux, oids]
 import image, linuxutils, settings, cgroups, seccomputils, network
 
 type
