@@ -1,4 +1,4 @@
-import json, os, strformat
+import std/[json, os, strformat]
 import seccomp
 import linuxutils
 

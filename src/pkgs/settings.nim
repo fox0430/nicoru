@@ -1,4 +1,4 @@
-import os
+import std/os
 
 type NetworkMode* {.pure.} = enum
   none

@@ -1,6 +1,6 @@
 {.deadCodeElim:on.}
 
-import posix, linux, strformat, strutils
+import std/[posix, linux, strformat, strutils]
 import syscall
 
 const

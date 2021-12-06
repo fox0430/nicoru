@@ -1,4 +1,4 @@
-import parseopt, strformat, os, strutils, pegs, options
+import std/[parseopt, strformat, os, strutils, pegs, options]
 import settings, help, container, image, cgroups, network
 
 type CmdOption* = object

@@ -1,4 +1,4 @@
-import json
+import std/json
 
 type ImageManifestV1Config* = object
   mediaType*: string

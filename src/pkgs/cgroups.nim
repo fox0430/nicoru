@@ -1,4 +1,4 @@
-import posix
+import std/posix
 import linuxutils
 
 type CgroupsSettgings* = object

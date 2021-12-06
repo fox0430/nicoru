@@ -1,6 +1,7 @@
 {.deadCodeElim:on.}
 
-import posix, strformat, os, strutils, osproc, json, marshal, options, sequtils
+import std/[posix, strformat, os, strutils, osproc, json, marshal, options,
+            sequtils]
 import linuxutils, settings
 
 type
