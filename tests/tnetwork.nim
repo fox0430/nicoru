@@ -1,5 +1,5 @@
 import unittest
-import src/pkgs/settings
+import src/pkgs/[settings, container]
 include src/pkgs/network
 
 suite "Update network_state.json":
@@ -13,7 +13,7 @@ suite "Update network_state.json":
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
       veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
       brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
 
@@ -34,7 +34,7 @@ suite "Update network_state.json":
     check json["bridges"][0]["vethPairs"].len == 1
 
     check json["bridges"][0]["vethPairs"][0].contains("containerId")
-    check json["bridges"][0]["vethPairs"][0]["containerId"].getStr == containerId
+    check json["bridges"][0]["vethPairs"][0]["containerId"].getStr == $containerId
 
     check json["bridges"][0]["vethPairs"][0].contains("veth")
     let vethJson = json["bridges"][0]["vethPairs"][0]["veth"]
@@ -49,10 +49,10 @@ suite "Update network_state.json":
 
     let
       # TODO: Fix
-      containerId = $genOid()
+      containerId = genContainerId()
       veth = NetworkInterface(name: "veth0", ipAddr: some(IpAddr(address: "10.0.0.2", subnetMask: some(24))))
       brVeth = NetworkInterface(name: "brVeth0", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
 
       rtVethIpAddr = some(defaultBridgeIpAddr())
       rtVeth = NetworkInterface(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
@@ -73,7 +73,7 @@ suite "Update network_state.json":
     const NETWORK_STATE_PATH = "/tmp/network_state.json"
     updateNetworkState(network, NETWORK_STATE_PATH)
 
-    network.removeIpFromNetworkInterface(defaultBridgeName(), containerId)
+    network.removeIpFromNetworkInterface(defaultBridgeName(), $containerId)
     updateNetworkState(network, NETWORK_STATE_PATH)
 
     let json = parseFile(NETWORK_STATE_PATH)
@@ -127,18 +127,18 @@ suite "Network object":
   test "Remove NetworkInterface from Network":
     let
       # TODO: Fix
-      containerId = $genOid()
+      containerId = genContainerId()
 
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
       veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
       brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
 
     var network = Network(bridges: @[bridge])
 
-    network.removeIpFromNetworkInterface(defaultBridgeName(), containerId)
+    network.removeIpFromNetworkInterface(defaultBridgeName(), $containerId)
 
     check network.bridges[0].vethPairs.len == 0
 
