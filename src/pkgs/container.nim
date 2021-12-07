@@ -1,5 +1,5 @@
-import os, oids, strformat, json, osproc, posix, inotify, strutils, options,
-       linux, oids
+import std/[os, oids, strformat, json, osproc, posix, inotify, strutils, options,
+            linux, oids]
 import image, linuxutils, settings, cgroups, seccomputils, network
 
 type
@@ -9,6 +9,12 @@ type
     running
     stop
     dead
+
+  ContainerInfo = object
+    containerId: ContainerId
+    repository: string
+    tag: string
+    state: State
 
   ContainerConfig = object
     containerId: ContainerId
@@ -43,22 +49,56 @@ proc checkContainerState(json: JsonNode): State =
           result = State.dead
 
 # Get all container
-proc checkExistContainers(containersDir: string): seq[string] =
+proc getAllConrainer(containersDir: string): seq[ContainerInfo] =
   for containerDir in walkDir(containersDir):
     for p in walkDir(containerDir.path):
       if p.kind == pcFile and p.path == containerDir.path / "config.json":
         let
           json = parseFile(p.path)
           id = json["ContainerId"].getStr
-          repo =json["Repository"].getStr
-          tag =json["Tag"].getStr
+          repo = json["Repository"].getStr
+          tag = json["Tag"].getStr
           state = json.checkContainerState
-        result.add(fmt"{id} {repo}:{tag} {state}")
+        result.add ContainerInfo(containerId: ContainerId(id),
+                                 repository: repo,
+                                 tag: tag,
+                                 state: state)
 
 proc writeAllContainerState*(containesrDir: string) =
-  let list = checkExistContainers(containesrDir)
-  for s in list:
-    echo s
+  let list = getAllConrainer(containesrDir)
+
+  const CONTAINER_ID_LEN = 24
+  var firstLine = "CONTAINER ID"
+  firstLine &= " ".repeat(CONTAINER_ID_LEN - "CONTAINER_ID".len + 2)
+
+  var
+    repoMaxLen = "REPOSITORY".len
+    tagMaxLen = "TAG".len
+
+  for item in list:
+    let repo = item.repository
+    if repo.len > repoMaxLen and repo.len > "REPOSITORY".len:
+      repoMaxLen = item.repository.len
+
+    let tag = item.tag
+    if tag.len > tagMaxLen and tag.len > "TAG".len:
+      tagMaxLen = item.tag.len
+
+  firstLine &= "REPOSITORY" & " ".repeat(repoMaxLen - "REPOSITORY".len + 2)
+  firstLine &= "TAG" & " ".repeat(tagMaxLen - "TAG".len + 2)
+  firstLine &= "STATE"
+
+  # Show container list
+  echo firstLine
+  for c in list:
+    let
+      space1 = "  "
+      space2 = " ".repeat(repoMaxLen - c.repository.len + 2)
+      space3 = " ".repeat(tagMaxLen- c.tag.len + 2)
+    echo $c.containerId & space1 &
+         c.repository & space2 &
+         c.tag & space3 &
+         $c.state
 
 proc isExistContainer(containesrsDir: string, containerId: ContainerId): bool =
   for p in walkDir(containesrsDir):
