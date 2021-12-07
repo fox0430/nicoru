@@ -94,7 +94,7 @@ proc writeAllContainerState*(containesrDir: string) =
     let
       space1 = "  "
       space2 = " ".repeat(repoMaxLen - c.repository.len + 2)
-      space3 = " ".repeat(tagMaxLen- c.tag.len + 2)
+      space3 = " ".repeat(tagMaxLen - c.tag.len + 2)
     echo $c.containerId & space1 &
          c.repository & space2 &
          c.tag & space3 &
