@@ -207,36 +207,43 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   else:
     # TODO: Fix: Add validator for options
 
-    let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
+    var portPair = none(PublishPortPair)
 
-    # Enable/Disable background
-    if cmdParseInfo.shortOptions.containsKey("b"):
-      runtimeSettings.background = true
-
-    # Enable/Disable seccomp
-    if cmdParseInfo.longOptions.containsKey("seccomp"):
-      runtimeSettings.seccomp = true
-
-    # Set a path for a seccomp profile
-    if cmdParseInfo.longOptions.containsKey("seccomp-profile"):
-      if cmdParseInfo.longOptions["seccomp-profile"].len > 0:
-        runtimeSettings.seccompProfilePath = cmdParseInfo.longOptions["seccomp-profile"]
+    for shortOption in cmdParseInfo.shortOptions:
+      # Enable/Disable background
+      if $shortOption == "b":
+        runtimeSettings.background = true
       else:
+        # TODO: Fix
         writeCmdLineError($args)
 
-    # Set a network mode
-    var portPair = none(PublishPortPair)
-    if cmdParseInfo.longOptions.containsKey("net"):
-      let networkMode = cmdParseInfo.longOptions["net"]
-      if isNetworkMode(networkMode):
-        runtimeSettings.networkMode = cmdParseInfo.longOptions["net"].toNetworkMode
+    for longOption in cmdParseInfo.longOptions:
+      # Enable/Disable Seccomp
+      if longOption.key == "seccomp":
+        runtimeSettings.seccomp = true
 
-        if cmdParseInfo.longOptions.containsKey("port"):
-          if NetworkMode.bridge == runtimeSettings.networkMode:
-            portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
-          else:
-            # TODO: Fix
-            writeCmdLineError($args)
+      # Set a path for a seccomp profile
+      elif longOption.key == "seccomp-profile":
+        if len(longOption.val) > 0:
+          runtimeSettings.seccompProfilePath = longOption.val
+        else:
+          writeCmdLineError($args)
+
+      # Set a network mode
+      elif longOption.key == "net":
+        let networkMode = longOption.val
+        if isNetworkMode(networkMode):
+          runtimeSettings.networkMode = toNetworkMode(networkMode)
+
+      # Set a publish port
+      elif longOption.key == "port":
+        if NetworkMode.bridge == runtimeSettings.networkMode:
+          portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
+        else:
+          # TODO: Fix
+          writeCmdLineError($args)
+      else:
+        writeCmdLineError($args)
 
     if args.len > 1:
       let
@@ -249,6 +256,8 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
       if not runtimeSettings.checkImageInLocal(image, tag):
         runtimeSettings.pullImage(image, tag)
+
+      let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
 
       let command = if args.len > 1: args[2 .. ^1] else: @[""]
 
