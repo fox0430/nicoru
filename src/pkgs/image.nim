@@ -4,6 +4,7 @@ import settings
 type ImageInfo = object
   repo: string
   tag: string
+  id: string
 
 type ImageConfig* = object
   hostname*: string
@@ -244,7 +245,7 @@ proc pullImage*(settings: RuntimeSettings, repo, tag: string) =
   settings.updateImageDb(repo, tag, imageId)
 
 # Get all images in local
-proc getImageList(settings: RuntimeSettings): seq[string] =
+proc getAllImage(settings: RuntimeSettings): seq[ImageInfo] =
   let
     dbPath = settings.databasePath()
 
@@ -252,16 +253,40 @@ proc getImageList(settings: RuntimeSettings): seq[string] =
     let dbJson = parseFile(dbPath)
     for key, val in dbJson["Repository"]:
       for key, item in val:
-        let id = (item.getStr)[7 .. ^1]
-        result.add(fmt "{key} {id}")
+        let
+          repo = if key.contains(":"): (key.split(":"))[0] else: key
+          tag = if key.contains(":"): (key.split(":"))[1] else: ""
+          id = (item.getStr)[7 .. ^1]
+
+        result.add ImageInfo(repo: repo, tag: tag, id: id)
 
 # Show all image in local
 proc writeImageList*(settings: RuntimeSettings) =
-  let images = settings.getImageList()
+  let images = settings.getAllImage()
 
-  echo "Repository:Tag\n"
+  var
+    firstLine = "REPOSITORY"
+
+    repoMaxLen = "REPOSITORY".len
+    tagMaxLen = "TAG".len
+
   for image in images:
-    echo image
+    if image.repo.len > repoMaxLen:
+      repoMaxLen = image.repo.len
+
+    if image.tag.len > tagMaxLen:
+      tagMaxLen = image.tag.len
+
+  firstLine &= " ".repeat(repoMaxLen - "REPOSITORY".len + 2)
+  firstLine &= "TAG" & " ".repeat(tagMaxLen - "TAG".len + 2)
+  firstLine &= "IMAGE ID"
+
+  # Show all image info
+  echo firstLine
+  for image in images:
+    echo image.repo & " ".repeat(repoMaxLen - image.repo.len + 2) &
+         image.tag & " ".repeat(tagMaxLen - image.tag.len + 2) &
+         image.id
 
 proc checkImageInLocal*(settings: RuntimeSettings, repo, tag: string): bool =
   let
