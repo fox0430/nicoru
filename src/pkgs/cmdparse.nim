@@ -50,8 +50,12 @@ proc writeVersion() =
   echo generateVersionInfoMessage()
   quit()
 
-proc writeCmdLineError(key: string) =
-  echo fmt"Unknown option: {key}"
+proc writeCmdArgError(key: string) =
+  echo fmt"Error: Invalid arg: {key}"
+  quit()
+
+proc writeCmdOptionError(key: string) =
+  echo fmt"Error: Invalid option: {key}"
   quit()
 
 proc initCgroupsSettings(longOptions: seq[CmdOption]): CgroupsSettgings =
@@ -131,7 +135,7 @@ proc cmdPull(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     let imageAndTag = parseImageAndTag(args[1])
     pullImage(runtimeSettings, imageAndTag[0], imageAndTag[1])
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -141,7 +145,7 @@ proc cmdImages(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   elif args.len == 1:
     runtimeSettings.writeImageList()
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -166,7 +170,7 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       cgroupSettings,
       command)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc isNetworkMode(str: string): bool {.inline.} =
   case str:
@@ -182,20 +186,19 @@ proc isDigit*(seqStr: seq[string]): bool =
       if not isDigit(c): return false
   return true
 
-proc parsePublishPort(str: string): PublishPortPair =
+proc parsePublishPort(str: string): Option[PublishPortPair] =
   if str.contains(':'):
     let splited = str.split(":")
     if splited.len == 2 and isDigit(splited):
       let
         hPort = parseInt(splited[0])
         cPort = parseInt(splited[1])
-      return initPublishPortPair(hPort, cPort)
+        portPair = initPublishPortPair(hPort, cPort)
+      return some(portPair)
     else:
-      # TODO: Fix this error
-      writeCmdLineError(fmt"Failed to parse port: '{str}'")
+      none(PublishPortPair)
   else:
-    # TODO: Fix this error
-    writeCmdLineError(fmt"Failed to parse port: '{str}'")
+    none(PublishPortPair)
 
 proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -207,36 +210,45 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   else:
     # TODO: Fix: Add validator for options
 
-    let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
-
-    # Enable/Disable background
-    if cmdParseInfo.shortOptions.containsKey("b"):
-      runtimeSettings.background = true
-
-    # Enable/Disable seccomp
-    if cmdParseInfo.longOptions.containsKey("seccomp"):
-      runtimeSettings.seccomp = true
-
-    # Set a path for a seccomp profile
-    if cmdParseInfo.longOptions.containsKey("seccomp-profile"):
-      if cmdParseInfo.longOptions["seccomp-profile"].len > 0:
-        runtimeSettings.seccompProfilePath = cmdParseInfo.longOptions["seccomp-profile"]
-      else:
-        writeCmdLineError($args)
-
-    # Set a network mode
     var portPair = none(PublishPortPair)
-    if cmdParseInfo.longOptions.containsKey("net"):
-      let networkMode = cmdParseInfo.longOptions["net"]
-      if isNetworkMode(networkMode):
-        runtimeSettings.networkMode = cmdParseInfo.longOptions["net"].toNetworkMode
 
-        if cmdParseInfo.longOptions.containsKey("port"):
-          if NetworkMode.bridge == runtimeSettings.networkMode:
-            portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
+    for shortOption in cmdParseInfo.shortOptions:
+      # Enable/Disable background
+      if $shortOption == "b":
+        runtimeSettings.background = true
+      else:
+        writeCmdOptionError($shortOption)
+
+    for longOption in cmdParseInfo.longOptions:
+      # Enable/Disable Seccomp
+      if longOption.key == "seccomp":
+        runtimeSettings.seccomp = true
+
+      # Set a path for a seccomp profile
+      elif longOption.key == "seccomp-profile":
+        if len(longOption.val) > 0:
+          runtimeSettings.seccompProfilePath = longOption.val
+        else:
+          writeCmdOptionError($longOption.key)
+
+      # Set a network mode
+      elif longOption.key == "net":
+        let networkMode = longOption.val
+        if isNetworkMode(networkMode):
+          runtimeSettings.networkMode = toNetworkMode(networkMode)
+
+      # Set a publish port
+      elif longOption.key == "port":
+        if NetworkMode.bridge == runtimeSettings.networkMode:
+          let p = parsePublishPort(cmdParseInfo.longOptions["port"])
+          if p.isSome:
+            portPair = p
           else:
-            # TODO: Fix
-            writeCmdLineError($args)
+            writeCmdOptionError($longOption.key)
+        else:
+          writeCmdOptionError($longOption.key)
+      else:
+        writeCmdOptionError($longOption.key)
 
     if args.len > 1:
       let
@@ -249,6 +261,8 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
       if not runtimeSettings.checkImageInLocal(image, tag):
         runtimeSettings.pullImage(image, tag)
+
+      let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
 
       let command = if args.len > 1: args[2 .. ^1] else: @[""]
 
@@ -270,7 +284,7 @@ proc cmdPs(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     let containersDir = runtimeSettings.baseDir / "containers"
     writeAllContainerState(containersDir)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -285,7 +299,7 @@ proc cmdRm(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       containerId = ContainerId(args[1])
     removeContainer(containersDir, containerId)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -299,7 +313,7 @@ proc cmdRmi(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       image = args[1]
     runtimeSettings.removeImage(image)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdStart(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -323,14 +337,17 @@ proc cmdStart(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) 
 
         if cmdParseInfo.longOptions.containsKey("port"):
           if NetworkMode.bridge == runtimeSettings.networkMode:
-            portPair = some(parsePublishPort(cmdParseInfo.longOptions["port"]))
+            let p = parsePublishPort(cmdParseInfo.longOptions["port"])
+            if p.isSome:
+              portPair = p
+            else:
+              writeCmdOptionError("port")
           else:
-            # TODO: Fix
-            writeCmdLineError($args)
+            writeCmdOptionError("port")
 
     startContainer(runtimeSettings, portPair, containersDir, containerId)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdLog(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let args = cmdParseInfo.argments
@@ -345,7 +362,7 @@ proc cmdLog(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
       containerId = ContainerId(args[1])
     writeContainerLog(containersDir, containerId)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   let
@@ -366,7 +383,7 @@ proc cmdStop(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     else:
       stopContainer(containersDir, containerId)
   else:
-    writeCmdLineError($args)
+    writeCmdArgError($args)
 
 proc checkArgments*(runtimeSettings: var RuntimeSettings,
                     cmdParseInfo: CmdParseInfo) =
@@ -399,19 +416,19 @@ proc checkArgments*(runtimeSettings: var RuntimeSettings,
     of "stop":
       cmdStop(runtimeSettings, cmdParseInfo)
     else:
-      writeCmdLineError($args)
+      writeCmdArgError($args)
 
 proc checkShortOptions*(shortOptions: seq[CmdOption]) =
   if shortOptions.len > 1:
-    writeCmdLineError($shortOptions)
+    writeCmdOptionError($shortOptions)
   else:
     if shortOptions[0].key == "h":
       writeTopHelp()
     elif shortOptions[0].key == "v":
       writeVersion()
     else:
-      writeCmdLineError($shortOptions)
+      writeCmdOptionError($shortOptions)
 
 proc checkLongOptions*(longOptions: seq[CmdOption]) =
   if longOptions.len > 0:
-    writeCmdLineError($longOptions)
+    writeCmdOptionError($longOptions)
