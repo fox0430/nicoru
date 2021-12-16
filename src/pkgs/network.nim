@@ -724,5 +724,5 @@ proc initNicoruNetwork*(networkStatePath: string, isBridgeMode: bool): Network =
     result.bridges[^1].setBridgeIpAddr
     result.bridges[^1].setNatIpAddr
 
-  if not bridgeExists(BRIDGE_NAME):
-    createBridge(result.bridges[^1])
+    if not bridgeExists(BRIDGE_NAME):
+      createBridge(result.bridges[^1])
