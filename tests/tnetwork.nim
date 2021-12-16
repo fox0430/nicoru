@@ -13,7 +13,7 @@ suite "Update network_state.json":
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
       veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
       brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
 
@@ -52,7 +52,7 @@ suite "Update network_state.json":
       containerId = genContainerId()
       veth = NetworkInterface(name: "veth0", ipAddr: some(IpAddr(address: "10.0.0.2", subnetMask: some(24))))
       brVeth = NetworkInterface(name: "brVeth0", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       rtVethIpAddr = some(defaultBridgeIpAddr())
       rtVeth = NetworkInterface(name: defaultRtBridgeVethName(), ipAddr: rtVethIpAddr)
@@ -73,7 +73,7 @@ suite "Update network_state.json":
     const NETWORK_STATE_PATH = "/tmp/network_state.json"
     updateNetworkState(network, NETWORK_STATE_PATH)
 
-    network.removeIpFromNetworkInterface(defaultBridgeName(), $containerId)
+    network.removeIpFromNetworkInterface(defaultBridgeName(), containerId)
     updateNetworkState(network, NETWORK_STATE_PATH)
 
     let json = parseFile(NETWORK_STATE_PATH)
@@ -110,7 +110,7 @@ suite "Network object":
 
     check bridge.vethPairs.len == 1
     let vethPair = bridge.vethPairs[0]
-    check vethPair.containerId == "61a9c9a6a5660623f4672b0a"
+    check vethPair.containerId == ContainerId("61a9c9a6a5660623f4672b0a")
 
     check vethPair.veth.isSome
     check vethPair.veth.get.name == "veth0"
@@ -132,13 +132,13 @@ suite "Network object":
       vethIpAddr = IpAddr(address: "10.0.0.2", subnetMask: some(24))
       veth = NetworkInterface(name: "veth", ipAddr: some(vethIpAddr))
       brVeth = NetworkInterface(name: "brVeth", ipAddr: none(IpAddr))
-      vethPair = VethPair(containerId: $containerId, veth: some(veth), brVeth: some(brVeth))
+      vethPair = VethPair(containerId: containerId, veth: some(veth), brVeth: some(brVeth))
 
       bridge = Bridge(name: defaultBridgeName(), vethPairs: @[vethPair])
 
     var network = Network(bridges: @[bridge])
 
-    network.removeIpFromNetworkInterface(defaultBridgeName(), $containerId)
+    network.removeIpFromNetworkInterface(defaultBridgeName(), containerId)
 
     check network.bridges[0].vethPairs.len == 0
 

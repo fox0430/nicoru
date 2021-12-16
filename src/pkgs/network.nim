@@ -2,7 +2,7 @@
 
 import std/[posix, strformat, os, strutils, osproc, json, marshal, options,
             sequtils]
-import linuxutils, settings
+import linuxutils, settings, containerutil
 
 type
   Port = int
@@ -20,8 +20,7 @@ type
     ipAddr: Option[IpAddr]
 
   VethPair* = object
-    # TODO: Use container.ContainerId
-    containerId: string
+    containerId: ContainerId
     # Created inside a container
     veth: Option[NetworkInterface]
     # Connect a bridge with veth (Doesn't have a IP Address)
@@ -212,9 +211,8 @@ proc getBridge*(bridges: seq[Bridge], bridgeName: string): Bridge =
 
   exception(fmt"Bridge object not found: '{bridgeName}'")
 
-# TODO: Use container.ContainerId
 proc getVethPair*(bridge: Bridge,
-                  containerId: string): VethPair =
+                  containerId: ContainerId): VethPair =
 
   for vethPair in bridge.vethPairs:
     if vethPair.containerId == containerId:
@@ -239,11 +237,9 @@ proc initPublishPortPair*(hPort, cPort: int): PublishPortPair {.inline.} =
 proc initVeth(name: string, ipAddr: IpAddr): NetworkInterface {.inline.} =
   return NetworkInterface(name: name, ipAddr: some(ipAddr))
 
-# TODO: Use container.ContainerId
-proc initVethPair(containerId: string,
+proc initVethPair(containerId: ContainerId,
                   veth, brVeth: NetworkInterface): VethPair {.inline.} =
 
-# TODO: Use container.ContainerId
   return VethPair(containerId: containerId,
                   veth: some(veth),
                   brVeth: some(brVeth))
@@ -294,7 +290,7 @@ proc toPublishPortPair(json: JsonNode): PublishPortPair =
 proc toVethPair(json: JsonNode): VethPair =
   let containerId = json["containerId"].getStr
 
-  result.containerId = containerId
+  result.containerId = ContainerId(containerId)
 
   if json["veth"]["has"].getBool:
     let veth = toNetworkInterface(json["veth"]["val"])
@@ -410,10 +406,10 @@ proc newVethIpAddr(vethPairs: seq[VethPair]): string =
 
   return fmt"10.0.0.{maxNum + 1}"
 
-# TODO Use container.ContainerId
 # Add a new iface to Bridge.iface
 proc addNewNetworkInterface*(bridge: var Bridge,
-                             containerId, baseVethName, baseBrVethName: string,
+                             containerId: ContainerId,
+                             baseVethName, baseBrVethName: string,
                              isBridgeMode: bool) =
 
   var vethPair = VethPair(containerId: containerId)
@@ -441,8 +437,7 @@ proc addNewNetworkInterface*(bridge: var Bridge,
 proc add*(bridge: var Bridge, vethPair: VethPair) =
   bridge.vethPairs.add vethPair
 
-# TODO Use container.ContainerId
-proc addIpToNetworkInterface(containerId, ipAddr: string) =
+proc addIpToNetworkInterface(containerId: ContainerId, ipAddr: string) =
   const filePath = networkStatePath()
 
   if fileExists(filePath):
@@ -454,12 +449,12 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
 
     if json.contains("ips"):
       var iface = json["ips"]
-      iface.add(%* {containerId: ipAddr})
+      iface.add(%* {$containerId: ipAddr})
 
       let newJson = %* {"ips": iface}
       writeFile(filePath, $newJson)
   else:
-    let json = %* {"ips": [{containerId: ipAddr}]}
+    let json = %* {"ips": [{$containerId: ipAddr}]}
 
     try: createDir(runPath())
     except: exception(fmt"Failed to create a directory: '{runPath()}'")
@@ -467,8 +462,7 @@ proc addIpToNetworkInterface(containerId, ipAddr: string) =
     try: writeFile(filePath, $json)
     except: exception(fmt"Failed to write a json: '{filePath}'")
 
-# TODO Use container.ContainerId
-proc removeIpFromNetworkInterface*(network: var Network, bridgeName, containerId: string) =
+proc removeIpFromNetworkInterface*(network: var Network, bridgeName: string, containerId: ContainerId) =
   for bridgeIndex, b in network.bridges:
     if b.name == bridgeName:
       for ifaceIndex, vethPair in b.vethPairs:

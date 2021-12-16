@@ -33,6 +33,8 @@ proc genContainerId*(): ContainerId {.inline.} = ContainerId($genOid())
 
 proc `$`*(containerId: ContainerId): string {.inline.} = string(containerId)
 
+proc `==`*(a, b: ContainerId): bool {.inline.} = string(a) == string(b)
+
 proc containerConfigPath*(settings: RuntimeSettings,
                           containerId: ContainerId): string {.inline.} =
 
