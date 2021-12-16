@@ -87,7 +87,7 @@ proc exitContainer(config: var ContainerConfig,
   if NetworkMode.bridge == settings.networkMode:
     let
       bridge = network.bridges.getBridge(bridgeName)
-      vethPair = bridge.getVethPair($config.containerId)
+      vethPair = bridge.getVethPair(config.containerId)
 
     if vethPair.publishPort.isSome and network.defautHostNic.isSome:
       removeContainerIptablesRule(vethPair,
@@ -95,7 +95,7 @@ proc exitContainer(config: var ContainerConfig,
                                   network.defautHostNic.get,
                                   bridge.natIpAddr.get)
 
-  network.removeIpFromNetworkInterface(bridgeName, $config.containerId)
+  network.removeIpFromNetworkInterface(bridgeName, config.containerId)
   network.updateNetworkState(networkStatePath())
 
 proc setEnv(envs: seq[string]) =
@@ -147,7 +147,7 @@ proc execContainer*(settings: RuntimeSettings,
     let index = network.currentBridgeIndex
 
     network.bridges[index].addNewNetworkInterface(
-      $containerId,
+      containerId,
       baseVethName(),
       baseBrVethName(),
       isBridgeMode)
