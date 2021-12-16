@@ -1,5 +1,5 @@
 import unittest
-import src/pkgs/[settings, container]
+import src/pkgs/[settings, container, containerutil]
 include src/pkgs/network
 
 suite "Update network_state.json":
