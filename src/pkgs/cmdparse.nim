@@ -58,32 +58,29 @@ proc writeCmdOptionError(key: string) =
   echo fmt"Error: Invalid option: {key}"
   quit()
 
-proc initCgroupsSettings(longOptions: seq[CmdOption]): CgroupsSettgings =
-  result = CgroupsSettgings()
+proc setCpuLimit(settings: var CgroupsSettgings, option: CmdOption) =
+  if option.val.len > 0:
+    settings.cpu = true
+    settings.cpuLimit = parseInt(option.val)
+  else:
+    echo "Error: Invalid value: --cpulimit"
+    quit()
 
-  if longOptions.containsKey("cpulimit"):
-    if longOptions["cpulimit"].len > 0:
-      result.cpu = true
-      result.cpuLimit = parseInt(longOptions["cpulimit"])
-    else:
-      echo "Error: Invalid value: --cpulimit"
-      quit()
+proc setCpuCoreLimit(settings: var CgroupsSettgings, option: CmdOption) =
+  if option.val.len > 0:
+    settings.cpuCore = true
+    settings.cpuCoreLimit = parseInt(option.val)
+  else:
+    echo "Error: Invalid value: --cpucorelimit"
+    quit()
 
-  if longOptions.containsKey("cpucorelimit"):
-    if longOptions["cpucorelimit"].len > 0:
-      result.cpuCore = true
-      result.cpuCoreLimit = parseInt(longOptions["cpucorelimit"])
-    else:
-      echo "Error: Invalid value: --cpucorelimit"
-      quit()
-
-  if longOptions.containsKey("memorylimit"):
-    if longOptions["memorylimit"].len > 0:
-      result.memory = true
-      result.memoryLimit = parseInt(longOptions["memorylimit"])
-    else:
-      echo "Error: Invalid value: --memorylimit"
-      quit()
+proc setMemoryLimit(settings: var CgroupsSettgings, option: CmdOption) =
+  if option.val.len > 0:
+    settings.memory = true
+    settings.memoryLimit = parseInt(option.val)
+  else:
+    echo "Error: Invalid value: --memorylimit"
+    quit()
 
 proc parseCommandLineOption*(): CmdParseInfo =
   var parsedLine = initOptParser()
@@ -158,7 +155,7 @@ proc cmdCreate(runtimeSettings: RuntimeSettings, cmdParseInfo: CmdParseInfo) =
     let
       command = if args.len > 1: args[2 .. ^1] else: @[""]
 
-      cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
+      cgroupSettings = CgroupsSettgings()
       containerDir = runtimeSettings.baseDir / "containers"
 
       imageAndTag = parseImageAndTag(args[1])
@@ -210,7 +207,10 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
   else:
     # TODO: Fix: Add validator for options
 
-    var portPair = none(PublishPortPair)
+    var
+      portPair = none(PublishPortPair)
+
+      cgroupSettings = CgroupsSettgings()
 
     for shortOption in cmdParseInfo.shortOptions:
       # Enable/Disable background
@@ -237,6 +237,18 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
         if isNetworkMode(networkMode):
           runtimeSettings.networkMode = toNetworkMode(networkMode)
 
+      # Cgroup
+      elif longOption.key == "cpulimit":
+        cgroupSettings.setCpuLimit(longOption)
+
+      # Cgroup
+      elif longOption.key == "cpucorelimit":
+        cgroupSettings.setCpuCoreLimit(longOption)
+
+      # Cgroup
+      elif longOption.key == "memorylimit":
+        cgroupSettings.setMemoryLimit(longOption)
+
       # Set a publish port
       elif longOption.key == "port":
         if NetworkMode.bridge == runtimeSettings.networkMode:
@@ -261,8 +273,6 @@ proc cmdRun(runtimeSettings: var RuntimeSettings, cmdParseInfo: CmdParseInfo) =
 
       if not runtimeSettings.checkImageInLocal(image, tag):
         runtimeSettings.pullImage(image, tag)
-
-      let cgroupSettings = initCgroupsSettings(cmdParseInfo.longOptions)
 
       let command = if args.len > 1: args[2 .. ^1] else: @[""]
 
