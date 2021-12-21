@@ -1,6 +1,19 @@
-import std/[unittest, os]
+import std/[unittest, osproc, strutils]
+
+proc buildNicoru(): bool =
+  let r = execCmdEx("nimble build -y")
+  if r.exitCode == 0:
+    return true
+
+proc getLastLineOfCmdResult(output: string): string =
+  let splited = output.splitLines
+  result = splited[splited.high - 1]
 
 suite "Integration":
   test "Run Container":
-    check execShellCmd("nimble build -y") == 0
-    check execShellCmd("sudo ./nicoru run alpine:latest ls") == 0
+
+    check buildNicoru()
+
+    let r = execCmdEx("""sudo ./nicoru run alpine:latest echo "ok"""")
+    check r.exitCode == 0
+    check getLastLineOfCmdResult(r.output) == "ok"
