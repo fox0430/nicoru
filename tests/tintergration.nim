@@ -20,11 +20,11 @@ suite "Integration":
     check getLastLineOfCmdResult(r.output) == "ok"
 
   test "ping in the container (Host mode)":
-    let r = execCmdEx("""sudo ./nicoru run alpine:latest ping -c 1 google.com""")
+    let r = execCmdEx("""sudo ./nicoru run alpine:latest 'ping -c 1 google.com'""")
     check r.exitCode == 0
 
   test "ping in the container (Bridge mode)":
-    let r = execCmdEx("sudo ./nicoru run --net=bridge alpine:latest ping -c 1 google.com")
+    let r = execCmdEx("sudo ./nicoru run --net=bridge alpine:latest 'ping -c 1 google.com'")
     check r.exitCode == 0
 
   test "ping in the container (None mode)":
