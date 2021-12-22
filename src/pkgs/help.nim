@@ -56,13 +56,13 @@ Usage:  nicoru run [OPTIONS] IMAGE [COMMAND] [ARG...]
 Options:
   -b                    Run a container in background
 
-  --cpulimit int        Limit CPU
-  --cpucorelimit int    Limit CPU core
-  --memorylimit         Limit memory
-  --seccomp             Enable Seccomp
-  --seccomp-profile     Seccomp profile path
-  --net                 Set Network mode
-  --port                Publishing ports
+  --cpulimit=<int>            Limit CPU
+  --cpucorelimit=<int>        Limit CPU core
+  --memorylimit=<int>         Limit memory
+  --seccomp                   Enable Seccomp
+  --seccomp-profile=<string>  Seccomp profile path
+  --net=<string>              Set Network mode
+  --port=<string>             Publishing ports
 """
 
 const startHelpMessage = """
