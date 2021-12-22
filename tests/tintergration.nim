@@ -43,6 +43,10 @@ suite "Integration":
     let r = execCmdEx("sudo ./nicoru run --cputlimit=100 alpine ls")
     check r.exitCode == 0
 
+  test "Set CPU core Limit":
+    let r = execCmdEx("sudo ./nicoru run --cpucore=1 alpine ls")
+    check r.exitCode == 0
+
   test "Set Memory Limit":
     let r = execCmdEx("sudo ./nicoru run --memorylimit=1000 alpine ls")
     check r.exitCode == 0
