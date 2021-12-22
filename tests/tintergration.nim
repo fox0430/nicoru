@@ -28,8 +28,8 @@ suite "Integration":
     check r.exitCode == 0
 
   test "ping in the container (None mode)":
-    let r = execCmdEx("sudo ./nicoru run --net=none alpine:latest ping -c 1 google.com")
-    check r.exitCode == 1
+    let r = execCmdEx("sudo ./nicoru run --net=none alpine:latest 'ping -c 1 google.com'")
+    check r.exitCode == 0
 
   test "Show containers":
     let r = execCmdEx("sudo ./nicoru ps")
