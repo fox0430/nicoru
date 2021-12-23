@@ -1,5 +1,3 @@
-{.deadCodeElim:on.}
-
 import std/[posix, linux, strformat, strutils]
 import syscall
 
