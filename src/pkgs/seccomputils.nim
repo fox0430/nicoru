@@ -76,7 +76,6 @@ proc setSysCallFiler*(profilePath: string = "") =
 
   if seccompSetting.syscall.len > 0:
     for syscall in seccompSetting.syscall:
-      echo syscall
       ctx.add_rule(syscall.action, syscall.name)
 
     ctx.load()
