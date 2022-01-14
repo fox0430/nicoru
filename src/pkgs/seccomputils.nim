@@ -1,4 +1,4 @@
-import std/[json, os, strformat]
+import std/[json, os, strformat, strutils]
 import seccomp
 import linuxutils
 
@@ -36,15 +36,16 @@ proc initSysCallSetting(name: string, action: ScmpAction): SyscallSetting =
 # Load prfile for Seccomp and init SeccompSetting and SyscallSetting
 proc initSeccompSetting(profile: JsonNode): SeccompSetting =
   if profile.contains("defaultAction"):
-    let val = profile["defaultAction"].getStr
+    let val = profile["defaultAction"].getStr.replace($"\\\"", "")
     if isAction(val):
       result.defaultAction = toAction(val)
 
   if profile.contains("syscalls"):
     for item in profile["syscalls"].items:
-      let action = item["action"].getStr.toAction
-      for name in item["names"].items:
-        result.syscall.add initSysCallSetting($name, action)
+      let action = item["action"].getStr.replace($"\\\"", "").toAction
+      for n in item["names"].items:
+        let name = n.getStr.replace($"\\\"", "")
+        result.syscall.add initSysCallSetting(name, action)
 
 # Load a default prfile for Seccomp in compile time
 proc defaultProfile(): string {.compiletime.} =

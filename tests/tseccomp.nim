@@ -26,7 +26,7 @@ suite "Seccomp":
     block:
       let action = defaultProfileJson["syscalls"][0]["action"].getStr.toAction
       for name in defaultProfileJson["syscalls"][0]["names"].items:
-        let syscallSetting = setting.searchSyscallSetting($name)
+        let syscallSetting = setting.searchSyscallSetting(name.getStr)
         check syscallSetting.action == action
 
   test "Load and init profile":
@@ -59,7 +59,7 @@ suite "Seccomp":
       for syscallProfile in  profileJson["syscalls"].items:
         let action = syscallProfile["action"].getStr.toAction
         for name in syscallProfile["names"].items:
-          let syscallSetting = setting.searchSyscallSetting($name)
+          let syscallSetting = setting.searchSyscallSetting(name.getStr)
           check syscallSetting.action == action
 
   test "Load and init profile 2":
