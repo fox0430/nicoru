@@ -275,16 +275,27 @@ proc execContainer*(settings: RuntimeSettings,
                      settings.seccompProfilePath
                     else:
                       ""
-        setSysCallFiler(path)
+        try:
+          setSysCallFiler(path)
+        except:
+          echo "Failed to init Seccomp"
+          writeFile(containerDir / "pid", "-1")
+          quit(1)
 
       try:
         execvp(config.cmd)
       except:
+        writeFile(containerDir / "pid", "-1")
         echo "Error execute command failed"
         quit(1)
     else:
       if config.cgroups.isCgroups:
-        config.cgroups.setupCgroups(secondForkPid)
+        try:
+          config.cgroups.setupCgroups(secondForkPid)
+        except:
+          echo "Failed to init Cgroup"
+          writeFile(containerDir / "pid", "-1")
+          quit(1)
 
       writeFile(containerDir / "pid", $secondForkPid)
 
@@ -302,6 +313,11 @@ proc execContainer*(settings: RuntimeSettings,
 
     # This pid is secondForkPid
     let pid = readFile(containerDir / "pid")
+    if pid == "-1":
+      let configPath = "config.json"
+      config.exitContainer(network, settings, State.dead, bridgeName, configPath)
+      echo "Failed to start a container"
+      quit(1)
 
     if isBridgeMode:
       # Add network interface
