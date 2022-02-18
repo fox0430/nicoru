@@ -259,14 +259,14 @@ proc setupGidMap*() =
     range = 1
     mapUser = 0
   let
-    realEuid = $getgid()
+    realGid = $getgid()
     path = "/proc/self/gid_map"
 
   echo path
   echo fileExists(path)
   echo "before: " & readFile(path)
 
-  writeFile(path, fmt"{mapUser} {realEuid} {range}")
+  writeFile(path, fmt"{mapUser} {realGid} {range}")
 
   echo "after: " & readFile(path)
 
