@@ -27,7 +27,7 @@ nicoru can run on only GNU/Linux
 
 ### Requires
 
-- Nim v1.6.0 or higher
+- Nim v1.6.2 or higher
 - libseccomp
 - ip(8) (Optional)
 - iptables(8) (Optional)
